@@ -43,7 +43,7 @@ object NotificationHelper {
         }
 
         val builder = NotificationCompat.Builder(context, ERROR_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_icon)
+            .setSmallIcon(R.drawable.ic_notification_icon2)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
