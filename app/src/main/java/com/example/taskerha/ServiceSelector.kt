@@ -1,4 +1,4 @@
-package com.example.taskerha
+package com.github.db1996.taskerha
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,24 +12,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.taskerha.datamodels.ActualService
+import com.github.db1996.taskerha.datamodels.ActualService
 
 
 @Composable
 fun ServiceSelectorBlocks(
     services: List<ActualService>,
-    onSelect: (ActualService) -> Unit
+    onSelect: (ActualService) -> Unit,
+    currentServiceSearch: String,
+    currentDomainSearch: String,
+    onServiceSearch: (String) -> Unit,
+    onDomainSearch: (String) -> Unit,
 ) {
-    var domainQuery by remember { mutableStateOf("") }
-    var serviceQuery by remember { mutableStateOf("") }
 
     // Filter services by both domain and service queries
-    val filteredServices = remember(domainQuery, serviceQuery, services) {
+    val filteredServices = remember(currentServiceSearch, currentDomainSearch, services) {
         services.filter { service ->
-            service.domain.contains(domainQuery, ignoreCase = true) &&
+            service.domain.contains(currentDomainSearch, ignoreCase = true) &&
                     (
-                            (service.name?.contains(serviceQuery, ignoreCase = true) ?: false) ||
-                                    service.id.contains(serviceQuery, ignoreCase = true)
+                            (service.name?.contains(currentServiceSearch, ignoreCase = true) ?: false) ||
+                                    service.id.contains(currentServiceSearch, ignoreCase = true)
                             )
         }
     }
@@ -45,16 +47,16 @@ fun ServiceSelectorBlocks(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = domainQuery,
-                onValueChange = { domainQuery = it },
+                value = currentDomainSearch,
+                onValueChange = onDomainSearch ,
                 label = { Text("Domain") },
                 singleLine = true,
                 modifier = Modifier.weight(1f)
             )
 
             OutlinedTextField(
-                value = serviceQuery,
-                onValueChange = { serviceQuery = it },
+                value = currentServiceSearch,
+                onValueChange = onServiceSearch,
                 label = { Text("Service") },
                 singleLine = true,
                 modifier = Modifier.weight(1f)

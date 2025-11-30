@@ -1,9 +1,9 @@
-package com.example.taskerha.client
+package com.github.db1996.taskerha.client
 
-import com.example.taskerha.datamodels.*
-import com.example.taskerha.enums.HomeassistantStatus
-import com.example.taskerha.enums.HaServiceFieldType
-import com.example.taskerha.datamodels.Option
+import com.github.db1996.taskerha.datamodels.*
+import com.github.db1996.taskerha.enums.HomeassistantStatus
+import com.github.db1996.taskerha.enums.HaServiceFieldType
+import com.github.db1996.taskerha.datamodels.Option
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer

@@ -1,4 +1,4 @@
-package com.example.taskerha
+package com.github.db1996.taskerha
 
 import android.util.Log
 import android.widget.Button
@@ -46,7 +46,10 @@ fun HomeassistantConfigScreen(
 
         // --- Search fields side by side ---
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { viewModel.unsetPickedService() }) {
+            Button(onClick = {
+                viewModel.unsetPickedService()
+
+            }) {
                 Text("Reset service/domain")
             }
             Button(onClick = { viewModel.testForm() }) {
@@ -54,7 +57,6 @@ fun HomeassistantConfigScreen(
             }
         }
         val activity = LocalContext.current as? ComponentActivity
-
         if(activity != null){
             Button(onClick = { viewModel.saveFormToTasker(activity)  }) {
                 Text("Save")
@@ -64,7 +66,11 @@ fun HomeassistantConfigScreen(
         if (selectedService == null && viewModel.services.isNotEmpty()) {
             ServiceSelectorBlocks(
                 services = viewModel.services,
-                onSelect = { service -> viewModel.pickService(service) }
+                onSelect = { service -> viewModel.pickService(service) },
+                currentDomainSearch = viewModel.currentDomainSearch,
+                currentServiceSearch = viewModel.currentServiceSearch,
+                onDomainSearch = { viewModel.currentDomainSearch = it },
+                onServiceSearch = { viewModel.currentServiceSearch = it }
             )
         }
 

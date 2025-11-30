@@ -1,4 +1,4 @@
-package com.example.taskerha.datamodels
+package com.github.db1996.taskerha.datamodels
 
 data class ActualService(
     val id: String,

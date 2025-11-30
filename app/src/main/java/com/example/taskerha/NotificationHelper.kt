@@ -1,4 +1,4 @@
-package com.example.taskerha
+package com.github.db1996.taskerha
 
 // In a new file: NotificationHelper.kt
 

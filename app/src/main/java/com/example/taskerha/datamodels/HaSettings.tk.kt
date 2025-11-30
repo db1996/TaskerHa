@@ -1,4 +1,4 @@
-package com.example.taskerha.datamodels
+package com.github.db1996.taskerha.datamodels
 
 import android.content.Context
 

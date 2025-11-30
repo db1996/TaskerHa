@@ -1,4 +1,4 @@
-package com.example.taskerha.ui.theme
+package com.github.db1996.taskerha.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

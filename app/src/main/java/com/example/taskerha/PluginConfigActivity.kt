@@ -1,4 +1,4 @@
-package com.example.taskerha
+package com.github.db1996.taskerha
 
 import android.content.Intent
 import android.os.Bundle
@@ -6,10 +6,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
-import com.example.taskerha.client.HomeAssistantClient
-import com.example.taskerha.datamodels.ActualService
-import com.example.taskerha.datamodels.FieldState
-import com.example.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.ActualService
+import com.github.db1996.taskerha.datamodels.FieldState
+import com.github.db1996.taskerha.datamodels.HaSettings
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json

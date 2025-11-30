@@ -1,4 +1,4 @@
-package com.example.taskerha.enums
+package com.github.db1996.taskerha.enums
 
 enum class HaServiceFieldType {
     TEXT,

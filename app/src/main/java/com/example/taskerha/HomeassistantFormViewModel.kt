@@ -1,15 +1,15 @@
-package com.example.taskerha
+package com.github.db1996.taskerha
 
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.taskerha.client.HomeAssistantClient
-import com.example.taskerha.datamodels.ActualService
-import com.example.taskerha.datamodels.FieldState
-import com.example.taskerha.datamodels.HaEntity
-import com.example.taskerha.datamodels.HomeassistantForm
+import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.ActualService
+import com.github.db1996.taskerha.datamodels.FieldState
+import com.github.db1996.taskerha.datamodels.HaEntity
+import com.github.db1996.taskerha.datamodels.HomeassistantForm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -31,6 +31,11 @@ class HomeassistantFormViewModel(
 
     var selectedService: ActualService? by mutableStateOf(null)
     var form: HomeassistantForm by mutableStateOf(HomeassistantForm())
+
+    var currentDomainSearch: String by mutableStateOf("")
+    var currentServiceSearch: String by mutableStateOf("")
+
+
 
     // ------------------ LOAD SERVICES ------------------
     fun loadServices(force: Boolean = false) {
@@ -88,7 +93,13 @@ class HomeassistantFormViewModel(
 
     fun unsetPickedService() {
         selectedService = null
-        form = HomeassistantForm()
+        form.domain = ""
+        form.service = ""
+        form.entityId = ""
+        form.dataContainer.clear()
+
+        currentDomainSearch = ""
+        currentServiceSearch = ""
     }
 
     // ------------------ PICK ENTITY ------------------

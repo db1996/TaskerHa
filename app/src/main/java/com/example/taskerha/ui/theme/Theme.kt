@@ -1,4 +1,4 @@
-package com.example.taskerha.ui.theme
+package com.github.db1996.taskerha.ui.theme
 
 import android.app.Activity
 import android.os.Build

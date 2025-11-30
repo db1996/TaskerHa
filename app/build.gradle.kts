@@ -6,13 +6,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.taskerha"
+    namespace = "com.github.db1996.taskerha"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.example.taskerha"
+        applicationId = "com.github.db1996.taskerha"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

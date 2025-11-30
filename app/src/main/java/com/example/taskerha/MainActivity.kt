@@ -1,4 +1,4 @@
-package com.example.taskerha
+package com.github.db1996.taskerha
 
 import android.Manifest
 import android.content.Intent
@@ -28,7 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.taskerha.ui.theme.TaskerHaTheme
+import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 
 class MainActivity : ComponentActivity() {
 

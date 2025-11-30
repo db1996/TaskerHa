@@ -1,6 +1,6 @@
-package com.example.taskerha.datamodels
+package com.github.db1996.taskerha.datamodels
 
-import com.example.taskerha.enums.HaServiceFieldType
+import com.github.db1996.taskerha.enums.HaServiceFieldType
 
 data class HaServiceField(
     val id: String,
