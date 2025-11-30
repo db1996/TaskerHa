@@ -23,6 +23,8 @@ fun HaSetupScreen() {
     var token by remember { mutableStateOf(HaSettings.loadToken(context)) }
 
     var status by remember { mutableStateOf<Status>(Status.Idle) }
+    var error by remember { mutableStateOf<String?>(null) }
+
     var testing by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
     var unsavedChanges by remember { mutableStateOf(false) }
@@ -33,6 +35,16 @@ fun HaSetupScreen() {
             unsavedChanges = true
         }else{
             unsavedChanges = false
+        }
+    }
+
+    fun setSaved(){
+        saved = true
+        checkUnsavedChanges()
+        // set saved back to false after 5 seconds
+        scope.launch {
+            delay(1200)
+            saved = false
         }
     }
 
@@ -73,13 +85,7 @@ fun HaSetupScreen() {
                 enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
                 onClick = {
                     HaSettings.save(context, url.trim(), token.trim())
-                    saved = true
-                    checkUnsavedChanges()
-                    // set saved back to false after 5 seconds
-                    scope.launch {
-                        delay(1200)
-                        saved = false
-                    }
+                    setSaved()
                 }) {
 
                 Text(if(saved)  "Saved!" else  "Save")
@@ -90,14 +96,12 @@ fun HaSetupScreen() {
                 onClick = {
                     testing = true
                     status = Status.Testing
-
-                    // Persist settings
-                    HaSettings.save(context, url.trim(), token.trim())
+                    val client = HomeAssistantClient(url, token)
 
                     scope.launch {
                         val success = withContext(Dispatchers.IO) {
                             try {
-                                HomeAssistantClient(url, token).ping()
+                                client.ping()
                             } catch (e: Exception) {
                                 false
                             }
@@ -105,6 +109,12 @@ fun HaSetupScreen() {
 
                         status = if (success) Status.Success else Status.Failed
                         testing = false
+                        error = client.error
+
+                        if(status == Status.Success){
+                            HaSettings.save(context, url.trim(), token.trim())
+                            setSaved()
+                        }
                     }
                 }) {
                 Text(if (testing) "Testing..." else "Test Connection")
@@ -112,17 +122,18 @@ fun HaSetupScreen() {
         }
 
 
-        StatusRow(status)
+        StatusRow(status, error)
     }
 }
 
+
 @Composable
-private fun StatusRow(status: Status) {
+private fun StatusRow(status: Status, error: String? = null) {
     val text = when (status) {
         Status.Idle -> ""
         Status.Testing -> "Testing connection..."
         Status.Success -> "✅ Connected successfully!"
-        Status.Failed -> "❌ Failed to connect"
+        Status.Failed -> "❌ Failed to connect: " + (error ?: "Unknown error")
     }
 
     Text(text)
