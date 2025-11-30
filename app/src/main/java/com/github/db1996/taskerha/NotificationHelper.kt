@@ -12,7 +12,7 @@ import androidx.core.app.NotificationManagerCompat
 
 object NotificationHelper {
 
-    private const val ERROR_CHANNEL_ID = "tasker_ha_error_channel"
+    private const val ERROR_CHANNEL_ID = "taskerha_error"
     private var errorNotificationId = 1
 
     fun createNotificationChannels(context: Context) {
