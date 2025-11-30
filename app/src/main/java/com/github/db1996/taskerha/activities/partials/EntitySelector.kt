@@ -41,7 +41,7 @@ fun EntitySelector(
 
     Column(
         modifier = modifier
-            .fillMaxWidth() // keep width full by default, height controlled by parent or heightIn below
+            .fillMaxWidth()
             .padding(vertical = 8.dp)
     ) {
         // Search row
@@ -71,12 +71,12 @@ fun EntitySelector(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Show results only when searching; bound height so it doesn't take the whole screen
+        // --- Filtered entity list
         if (searching) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 400.dp), // <-- bound the height (adjust to taste)
+                    .heightIn(max = 400.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
@@ -101,7 +101,6 @@ fun EntitySelector(
                     }
                 }
 
-                // optional: show a "no results" item when filteredEntities empty
                 if (filteredEntities.isEmpty()) {
                     item {
                         Text(

@@ -55,6 +55,7 @@ class HomeAssistantClient(
         }
     }
 
+    // --- Headers and request
     private fun request(path: String): Request =
         Request.Builder()
             .url("$baseUrl$path")
@@ -71,8 +72,7 @@ class HomeAssistantClient(
             .build()
     }
 
-    // ------------------ SAFE NETWORK CALLS ------------------
-
+    // --- API calls
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
         try {
             val response = http.newCall(request("/api/")).execute()
@@ -178,8 +178,7 @@ class HomeAssistantClient(
             }
         }
 
-    // ------------------ CONVERSIONS ------------------
-
+    // --- Conversions
     private fun convertService(haService: HaService, serviceId: String, domain: String): ActualService {
         val hasEntityTarget = haService.target?.containsKey("entity") ?: false
         val actualService = ActualService(

@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.activities.partials
+package com.github.db1996.taskerha.activities.screens
 
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -20,15 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.github.db1996.taskerha.ServiceSelectorBlocks
-import com.github.db1996.taskerha.viewmodels.HomeassistantFormViewModel
+import com.github.db1996.taskerha.activities.partials.ServiceSelector
+import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModel
 
 @Composable
-fun HomeassistantConfigScreen(
-    viewModel: HomeassistantFormViewModel,
+fun PluginConfigScreen(
+    viewModel: PluginConfigViewModel,
     onSave: (domain: String, service: String, entityId: String, data: Map<String, String>) -> Unit
 ) {
-    var entitySearching by remember { mutableStateOf(false) } // <--- lift here
+    var entitySearching by remember { mutableStateOf(false) }
     viewModel.loadServices()
     viewModel.loadEntities()
 
@@ -39,12 +41,12 @@ fun HomeassistantConfigScreen(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp, 32.dp) // space around the whole list
+            .padding(16.dp, 32.dp)
     ) {
-        Text("Create Home assistant service call")
+        Text("Create Home assistant service call", style = MaterialTheme.typography.headlineSmall)
 
 
-        // --- Search fields side by side ---
+        // --- Buttons
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = {
                 viewModel.unsetPickedService()
@@ -56,6 +58,7 @@ fun HomeassistantConfigScreen(
                 Text("Test action")
             }
         }
+
         val activity = LocalContext.current as? ComponentActivity
         if(activity != null){
             Button(onClick = { viewModel.saveFormToTasker(activity)  }) {
@@ -63,8 +66,9 @@ fun HomeassistantConfigScreen(
             }
         }
 
+        // --- If no service selected show selector list with search fields
         if (selectedService == null && viewModel.services.isNotEmpty()) {
-            ServiceSelectorBlocks(
+            ServiceSelector(
                 services = viewModel.services,
                 onSelect = { service -> viewModel.pickService(service) },
                 currentDomainSearch = viewModel.currentDomainSearch,
@@ -74,9 +78,10 @@ fun HomeassistantConfigScreen(
             )
         }
 
+        // If service is selected, show data fields + entity selector
         selectedService?.let { service ->
-            Text("Domain: ${service.domain}")
-            Text("Service: ${service.id}")
+            Text("Domain: ${service.domain}", style = MaterialTheme.typography.labelMedium)
+            Text("Service: ${service.id}", style = MaterialTheme.typography.labelMedium)
 
             Log.e("HA", "selectedService: ${selectedService.targetEntity}")
 
@@ -85,8 +90,8 @@ fun HomeassistantConfigScreen(
                     entities = viewModel.entities,
                     serviceDomain = service.domain,
                     currentEntityId = form.entityId,
-                    searching = entitySearching, // pass state down
-                    onSearchChanged = { entitySearching = it }, // allow child to update
+                    searching = entitySearching,
+                    onSearchChanged = { entitySearching = it },
                     onEntitySelected = { viewModel.pickEntity(it) }
                 )
             }

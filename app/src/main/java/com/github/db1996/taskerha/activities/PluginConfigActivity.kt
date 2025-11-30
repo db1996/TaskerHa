@@ -5,14 +5,14 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import com.github.db1996.taskerha.activities.partials.HomeassistantConfigScreen
+import com.github.db1996.taskerha.activities.screens.PluginConfigScreen
 import com.github.db1996.taskerha.TaskerConstants
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.FieldState
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
-import com.github.db1996.taskerha.viewmodels.HomeassistantFormViewModel
-import com.github.db1996.taskerha.viewmodels.HomeassistantFormViewModelFactory
+import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModel
+import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModelFactory
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -25,8 +25,8 @@ class PluginConfigActivity : AppCompatActivity() {
         HomeAssistantClient(url, token)
     }
 
-    private val viewModel: HomeassistantFormViewModel by viewModels {
-        HomeassistantFormViewModelFactory(client)
+    private val viewModel: PluginConfigViewModel by viewModels {
+        PluginConfigViewModelFactory(client)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,7 +40,7 @@ class PluginConfigActivity : AppCompatActivity() {
             val dataMap: Map<String, Any> = Json.Default.decodeFromString(
                 MapSerializer(String.Companion.serializer(), String.serializer()),
                 dataJson
-            ).mapValues { it.value as Any } // ensure it's Any
+            ).mapValues { it.value as Any }
 
             println("Domain: $domain")
             println("Service: $service")
@@ -68,19 +68,19 @@ class PluginConfigActivity : AppCompatActivity() {
 
         setContent {
             TaskerHaTheme() {
-                HomeassistantConfigScreen(viewModel) { domain, service, entityId, data ->
-                    // This is called from the user presses save
-                    val jsonData = Json.Default.encodeToString(
+                PluginConfigScreen(viewModel) { domain, service, entityId, data ->
+                    // --- User press save action
+                    val jsonData = Json.encodeToString(
                         MapSerializer(
                             String.serializer(),
                             String.serializer()
-                        ), data.mapValues { it.value.toString() })
+                        ), data.mapValues { it.value })
 
                     val bundle = Bundle().apply {
                         putString("DOMAIN", domain)
                         putString("SERVICE", service)
                         putString("ENTITY_ID", entityId)
-                        putSerializable("DATA", jsonData) // Bundle can't take Map directly
+                        putSerializable("DATA", jsonData)
                     }
 
                     val result = Intent().apply {

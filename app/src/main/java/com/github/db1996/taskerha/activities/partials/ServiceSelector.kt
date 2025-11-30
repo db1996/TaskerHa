@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.activities.partials
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,7 +16,7 @@ import com.github.db1996.taskerha.datamodels.ActualService
 
 
 @Composable
-fun ServiceSelectorBlocks(
+fun ServiceSelector(
     services: List<ActualService>,
     onSelect: (ActualService) -> Unit,
     currentServiceSearch: String,
@@ -41,7 +41,7 @@ fun ServiceSelectorBlocks(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // --- Search fields side by side ---
+        // --- Search fields
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -65,11 +65,11 @@ fun ServiceSelectorBlocks(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // --- Scrollable service list ---
+        // --- Filtered Services list
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f), // <-- THIS is what enables scrolling in remaining space
+                .weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(filteredServices) { service ->

@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.activities.partials
+package com.github.db1996.taskerha.activities.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun HaSetupScreen() {
+fun MainSettingsScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -41,7 +41,7 @@ fun HaSetupScreen() {
     fun setSaved(){
         saved = true
         checkUnsavedChanges()
-        // set saved back to false after 5 seconds
+        // set saved back to false after 1.2s
         scope.launch {
             delay(1200)
             saved = false
@@ -57,6 +57,7 @@ fun HaSetupScreen() {
     ) {
         Text("Home Assistant Setup", style = MaterialTheme.typography.headlineSmall)
 
+        // --- Input fields
         OutlinedTextField(
             value = url,
             onValueChange = {
@@ -77,6 +78,7 @@ fun HaSetupScreen() {
             singleLine = true
         )
 
+        // --- Buttons + result
         Row (
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween

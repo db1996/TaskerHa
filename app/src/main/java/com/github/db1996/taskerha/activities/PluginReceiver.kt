@@ -47,6 +47,7 @@ class PluginReceiver : BroadcastReceiver() {
 
                     Log.e("PluginReceiver", "Ping failed: $errorMessage")
                     NotificationHelper.showErrorNotification(context, "Onreceive can't ping HomeAssistant", errorMessage)
+
                     // Only set result if ordered
                     if (isOrderedBroadcast) {
                         Log.e("PluginReceiver", "Fatal crash: $errorMessage")
@@ -56,7 +57,7 @@ class PluginReceiver : BroadcastReceiver() {
                         pendingResult.setResultData(errorMessage)
                         pendingResult.setResultExtras(resultBundle)
                     }
-                    return@launch // goes to finally block
+                    return@launch
                 }
 
                 val ok = client.callService(
@@ -67,9 +68,10 @@ class PluginReceiver : BroadcastReceiver() {
                 )
 
                 if (!ok) {
-                    val errorMessage = client.error ?: "Home Assistant Service Call Failed (Unknown Error)"
+                    val errorMessage = client.error
                     resultBundle.putString(TaskerConstants.EXTRA_ERROR_MESSAGE, errorMessage)
                     NotificationHelper.showErrorNotification(context, "TaskerHA service call error", errorMessage)
+
                     if (isOrderedBroadcast) {
                         Log.e("PluginReceiver", "Fatal crash: $errorMessage")
                         // Signal failure
@@ -96,7 +98,6 @@ class PluginReceiver : BroadcastReceiver() {
                     pendingResult.setResultExtras(errorBundle)
                 }
             } finally {
-                // 3. Always finish the pending result
                 pendingResult.finish()
             }
         }
@@ -111,7 +112,6 @@ class PluginReceiver : BroadcastReceiver() {
                 dataJson
             ).mapValues { it.value as Any }
         } catch (e: Exception) {
-            // Log the decoding error if necessary
             Log.e("PluginReceiver", "Error decoding JSON data: $dataJson", e)
             emptyMap()
         }

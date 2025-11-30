@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.viewmodels
+package com.github.db1996.taskerha.activities.viewmodels
 
 import android.app.Activity
 import android.content.Intent
@@ -23,11 +23,9 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
-class HomeassistantFormViewModel(
+class PluginConfigViewModel(
     private val client: HomeAssistantClient
 ) : ViewModel() {
-
-    // Compose-friendly state
     var services: List<ActualService> by mutableStateOf(value = emptyList())
         private set
 
@@ -41,9 +39,6 @@ class HomeassistantFormViewModel(
     var currentDomainSearch: String by mutableStateOf("")
     var currentServiceSearch: String by mutableStateOf("")
 
-
-
-    // ------------------ LOAD SERVICES ------------------
     fun loadServices(force: Boolean = false) {
         viewModelScope.launch {
             try {
@@ -62,7 +57,6 @@ class HomeassistantFormViewModel(
         }
     }
 
-    // ------------------ LOAD ENTITIES ------------------
     fun loadEntities(force: Boolean = false) {
         viewModelScope.launch {
             try {
@@ -80,7 +74,6 @@ class HomeassistantFormViewModel(
         }
     }
 
-    // ------------------ PICK SERVICE ------------------
     fun pickService(pservice: ActualService) {
         selectedService = pservice
         form = HomeassistantForm()
@@ -108,12 +101,10 @@ class HomeassistantFormViewModel(
         currentServiceSearch = ""
     }
 
-    // ------------------ PICK ENTITY ------------------
     fun pickEntity(entityId: String) {
         form = form.copy(entityId = entityId)
     }
 
-    // ------------------ UPDATE FIELDS ------------------
     fun updateFieldValue(fieldId: String, value: String) {
         form.dataContainer[fieldId]?.value?.value = value
     }
@@ -122,21 +113,16 @@ class HomeassistantFormViewModel(
         form.dataContainer[fieldId]?.toggle?.value = toggle
     }
 
-    // ------------------ SAVE FORM ------------------
     fun testForm() {
         val domain = form.domain
         val service = form.service
         val entityId = form.entityId
 
-        // Extract actual values from MutableState
         val data = form.dataContainer
-            .filter { it.value.toggle.value } // only include toggled fields
-            .mapValues { it.value.value.value } // extract string value from MutableState
+            .filter { it.value.toggle.value }
+            .mapValues { it.value.value.value }
 
-
-        Log.d("HA", "Saving form: $domain, $service, $entityId, $data")
-
-
+        Log.d("HA", "Testing service call: $domain, $service, $entityId, $data")
 
         viewModelScope.launch {
             try {
@@ -155,10 +141,9 @@ class HomeassistantFormViewModel(
         val service = form.service
         val entityId = form.entityId
 
-        // Extract actual values from MutableState
         val data = form.dataContainer
-            .filter { it.value.toggle.value } // only include toggled fields
-            .mapValues { it.value.value.value } // extract string value from MutableState
+            .filter { it.value.toggle.value }
+            .mapValues { it.value.value.value }
 
         Log.d("HA", "Saving form: $domain, $service, $entityId, $data")
 
@@ -169,14 +154,14 @@ class HomeassistantFormViewModel(
                     MapSerializer(
                         String.Companion.serializer(),
                         String.serializer()
-                    ), data.mapValues { it.value.toString() })
+                    ), data.mapValues { it.value })
 
                 // --- RETURN TO TASKER ---
                 val bundle = Bundle().apply {
                     putString("DOMAIN", domain)
                     putString("SERVICE", service)
                     putString("ENTITY_ID", entityId)
-                    putSerializable("DATA", jsonData) // Bundle can't take Map directly
+                    putSerializable("DATA", jsonData)
                 }
 
                 val resultIntent = Intent().apply {

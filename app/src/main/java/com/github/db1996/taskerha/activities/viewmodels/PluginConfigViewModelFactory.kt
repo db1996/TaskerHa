@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.viewmodels
+package com.github.db1996.taskerha.activities.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -7,11 +7,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class HomeassistantFormViewModelFactory(
+class PluginConfigViewModelFactory(
     private val client: HomeAssistantClient
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(HomeassistantFormViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(PluginConfigViewModel::class.java)) {
             CoroutineScope(Dispatchers.IO).launch {
                 val successPing = client.ping()
                 if(!successPing){
@@ -23,7 +23,7 @@ class HomeassistantFormViewModelFactory(
 
             }
             @Suppress("UNCHECKED_CAST")
-            return HomeassistantFormViewModel(client) as T
+            return PluginConfigViewModel(client) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
