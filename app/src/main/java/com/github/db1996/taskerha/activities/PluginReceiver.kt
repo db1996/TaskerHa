@@ -1,16 +1,17 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.activities
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import com.github.db1996.taskerha.NotificationHelper
+import com.github.db1996.taskerha.TaskerConstants
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-// import kotlinx.coroutines.runBlocking // Not needed if using launch
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -45,7 +46,7 @@ class PluginReceiver : BroadcastReceiver() {
                     resultBundle.putString(TaskerConstants.EXTRA_ERROR_MESSAGE, errorMessage)
 
                     Log.e("PluginReceiver", "Ping failed: $errorMessage")
-                    NotificationHelper.showErrorNotification(context, "TaskerHA can't ping HomeAssistant", errorMessage)
+                    NotificationHelper.showErrorNotification(context, "Onreceive can't ping HomeAssistant", errorMessage)
                     // Only set result if ordered
                     if (isOrderedBroadcast) {
                         Log.e("PluginReceiver", "Fatal crash: $errorMessage")
@@ -105,8 +106,8 @@ class PluginReceiver : BroadcastReceiver() {
         val dataJson = bundle.getString("DATA") ?: return emptyMap()
 
         return try {
-            Json.decodeFromString(
-                MapSerializer(String.serializer(), String.serializer()),
+            Json.Default.decodeFromString(
+                MapSerializer(String.Companion.serializer(), String.serializer()),
                 dataJson
             ).mapValues { it.value as Any }
         } catch (e: Exception) {

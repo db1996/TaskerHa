@@ -1,7 +1,6 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.activities.partials
 
 import android.util.Log
-import android.widget.Button
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -22,6 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.github.db1996.taskerha.ServiceSelectorBlocks
+import com.github.db1996.taskerha.viewmodels.HomeassistantFormViewModel
 
 @Composable
 fun HomeassistantConfigScreen(
@@ -41,7 +41,7 @@ fun HomeassistantConfigScreen(
             .fillMaxWidth()
             .padding(16.dp, 32.dp) // space around the whole list
     ) {
-        Text("Home Assistant Form")
+        Text("Create Home assistant service call")
 
 
         // --- Search fields side by side ---

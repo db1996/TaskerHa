@@ -1,7 +1,5 @@
 package com.github.db1996.taskerha
 
-// In a new file: NotificationHelper.kt
-
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager

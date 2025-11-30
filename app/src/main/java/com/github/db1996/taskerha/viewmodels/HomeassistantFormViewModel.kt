@@ -1,10 +1,16 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.viewmodels
 
+import android.app.Activity
+import android.content.Intent
+import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.github.db1996.taskerha.TaskerConstants
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.FieldState
@@ -22,7 +28,7 @@ class HomeassistantFormViewModel(
 ) : ViewModel() {
 
     // Compose-friendly state
-    var services: List<ActualService> by mutableStateOf(emptyList())
+    var services: List<ActualService> by mutableStateOf(value = emptyList())
         private set
 
     var entities: List<HaEntity> by mutableStateOf(emptyList())
@@ -159,27 +165,36 @@ class HomeassistantFormViewModel(
         viewModelScope.launch {
             try {
 
-                val jsonData = Json.encodeToString(MapSerializer(String.serializer(), String.serializer()), data.mapValues { it.value.toString() })
+                val jsonData = Json.Default.encodeToString(
+                    MapSerializer(
+                        String.Companion.serializer(),
+                        String.serializer()
+                    ), data.mapValues { it.value.toString() })
 
                 // --- RETURN TO TASKER ---
-                val bundle = android.os.Bundle().apply {
+                val bundle = Bundle().apply {
                     putString("DOMAIN", domain)
                     putString("SERVICE", service)
                     putString("ENTITY_ID", entityId)
                     putSerializable("DATA", jsonData) // Bundle can't take Map directly
                 }
 
-                val resultIntent = android.content.Intent().apply {
+                val resultIntent = Intent().apply {
                     putExtra(TaskerConstants.EXTRA_BUNDLE, bundle)
+                    var msg = "Call Home Assistant: $domain.$service"
+                    if(entityId.isNotBlank()) {
+                        msg += " on $entityId"
+                    }
+
                     putExtra(
                         TaskerConstants.EXTRA_BLURB,
-                        "Call Home Assistant: $domain.$service"
+                        msg
                     )
                 }
 
                 // If the service call succeeded, return RESULT_OK, otherwise RESULT_CANCELED
                 activity.setResult(
-                    android.app.Activity.RESULT_OK,
+                    Activity.RESULT_OK,
                     resultIntent
                 )
                 activity.finish()
@@ -187,7 +202,7 @@ class HomeassistantFormViewModel(
             } catch (e: Exception) {
                 Log.e("HA", "Error calling service", e)
                 // Return failure to Tasker
-                activity.setResult(android.app.Activity.RESULT_CANCELED)
+                activity.setResult(Activity.RESULT_CANCELED)
                 activity.finish()
             }
         }

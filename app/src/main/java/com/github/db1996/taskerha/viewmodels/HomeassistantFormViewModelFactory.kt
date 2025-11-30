@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -6,7 +6,6 @@ import com.github.db1996.taskerha.client.HomeAssistantClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class HomeassistantFormViewModelFactory(
     private val client: HomeAssistantClient

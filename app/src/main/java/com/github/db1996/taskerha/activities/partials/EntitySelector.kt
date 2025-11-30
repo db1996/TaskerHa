@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.activities.partials
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

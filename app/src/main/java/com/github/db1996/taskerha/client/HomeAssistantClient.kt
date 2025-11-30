@@ -1,16 +1,31 @@
 package com.github.db1996.taskerha.client
 
-import com.github.db1996.taskerha.datamodels.*
-import com.github.db1996.taskerha.enums.HomeassistantStatus
-import com.github.db1996.taskerha.enums.HaServiceFieldType
+import com.github.db1996.taskerha.datamodels.ActualService
+import com.github.db1996.taskerha.datamodels.HaDomainService
+import com.github.db1996.taskerha.datamodels.HaEntity
+import com.github.db1996.taskerha.datamodels.HaService
+import com.github.db1996.taskerha.datamodels.HaServiceField
 import com.github.db1996.taskerha.datamodels.Option
+import com.github.db1996.taskerha.enums.HaServiceFieldType
+import com.github.db1996.taskerha.enums.HomeassistantStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.*
-import okhttp3.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 
@@ -62,7 +77,8 @@ class HomeAssistantClient(
         try {
             val response = http.newCall(request("/api/")).execute()
             if (!response.isSuccessful) {
-                error = if (response.code == 401) "Unauthorized, check your token" else response.message
+                error =
+                    if (response.code == 401) "Unauthorized, check your token" else response.message
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                 false
             } else {
@@ -97,27 +113,28 @@ class HomeAssistantClient(
 
     }
 
-    suspend fun getServices(force: Boolean = false): List<HaDomainService> = withContext(Dispatchers.IO) {
-        if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext emptyList()
-        if (services.isNotEmpty() && !force) return@withContext services
+    suspend fun getServices(force: Boolean = false): List<HaDomainService> =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext emptyList()
+            if (services.isNotEmpty() && !force) return@withContext services
 
-        try {
-            val response = http.newCall(request("/api/services")).execute()
-            if (!response.isSuccessful) {
-                error = response.message
+            try {
+                val response = http.newCall(request("/api/services")).execute()
+                if (!response.isSuccessful) {
+                    error = response.message
+                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                    return@withContext emptyList()
+                }
+
+                val body = response.body?.string() ?: return@withContext emptyList()
+                services = json.decodeFromString(body)
+                services
+            } catch (e: Exception) {
+                error = e.toString()
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                return@withContext emptyList()
+                emptyList()
             }
-
-            val body = response.body?.string() ?: return@withContext emptyList()
-            services = json.decodeFromString(body)
-            services
-        } catch (e: Exception) {
-            error = e.toString()
-            homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-            emptyList()
         }
-    }
 
     suspend fun getServicesFront(force: Boolean = false): List<ActualService> {
         val domainServices = getServices(force)
@@ -137,7 +154,7 @@ class HomeAssistantClient(
             data?.let { payload.putAll(it) }
 
             val body = json.encodeToString(
-                MapSerializer(String.serializer(), JsonElement.serializer()),
+                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
                 payload.mapValues { JsonPrimitive(it.value.toString()) }
             )
 
@@ -146,7 +163,8 @@ class HomeAssistantClient(
             try {
                 val response = http.newCall(req).execute()
                 if (!response.isSuccessful) {
-                    error = if (response.code == 401) "Unauthorized, check your token" else response.message
+                    error =
+                        if (response.code == 401) "Unauthorized, check your token" else response.message
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     false
                 } else {
@@ -218,7 +236,10 @@ class HomeAssistantClient(
                             } else {
                                 val obj = it.jsonObject
                                 fieldData.options!!.add(
-                                    Option(obj["label"]!!.jsonPrimitive.content, obj["value"]!!.jsonPrimitive.content)
+                                    Option(
+                                        obj["label"]!!.jsonPrimitive.content,
+                                        obj["value"]!!.jsonPrimitive.content
+                                    )
                                 )
                             }
                         }
