@@ -14,8 +14,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainSettingsScreen() {
+fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -28,7 +29,6 @@ fun MainSettingsScreen() {
     var testing by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
     var unsavedChanges by remember { mutableStateOf(false) }
-
 
     fun checkUnsavedChanges(){
         if(url != HaSettings.loadUrl(context) || token != HaSettings.loadToken(context)) {
@@ -48,15 +48,33 @@ fun MainSettingsScreen() {
         }
     }
 
+    LaunchedEffect(Unit) {
+        setTopBar {
+            TopAppBar(
+                title = { Text("HA Settings") },
+                actions = {
+                    Button(
+                        enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
+                        onClick = {
+                            HaSettings.save(context, url.trim(), token.trim())
+                            setSaved()
+                        }) {
+
+                        Text(if(saved)  "Saved!" else  "Save")
+                    }
+                }
+            )
+        }
+    }
+
+    val modifierFull = Modifier
+        .fillMaxSize()
+        .then(modifier)
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp, 48.dp),
+        modifier = modifierFull,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Home Assistant Setup", style = MaterialTheme.typography.headlineSmall)
-
         // --- Input fields
         OutlinedTextField(
             value = url,
@@ -78,51 +96,29 @@ fun MainSettingsScreen() {
             singleLine = true
         )
 
-        // --- Buttons + result
-        Row (
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Button(
-                enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
-                onClick = {
-                    HaSettings.save(context, url.trim(), token.trim())
-                    setSaved()
-                }) {
+        Button(
+            enabled = !testing && url.isNotBlank() && token.isNotBlank(),
+            onClick = {
+                testing = true
+                status = Status.Testing
+                val client = HomeAssistantClient(url, token)
 
-                Text(if(saved)  "Saved!" else  "Save")
-            }
-
-            Button(
-                enabled = !testing && url.isNotBlank() && token.isNotBlank(),
-                onClick = {
-                    testing = true
-                    status = Status.Testing
-                    val client = HomeAssistantClient(url, token)
-
-                    scope.launch {
-                        val success = withContext(Dispatchers.IO) {
-                            try {
-                                client.ping()
-                            } catch (e: Exception) {
-                                false
-                            }
-                        }
-
-                        status = if (success) Status.Success else Status.Failed
-                        testing = false
-                        error = client.error
-
-                        if(status == Status.Success){
-                            HaSettings.save(context, url.trim(), token.trim())
-                            setSaved()
+                scope.launch {
+                    val success = withContext(Dispatchers.IO) {
+                        try {
+                            client.ping()
+                        } catch (e: Exception) {
+                            false
                         }
                     }
-                }) {
-                Text(if (testing) "Testing..." else "Test Connection")
-            }
-        }
 
+                    status = if (success) Status.Success else Status.Failed
+                    testing = false
+                    error = client.error
+                }
+            }) {
+            Text(if (testing) "Testing..." else "Test Connection")
+        }
 
         StatusRow(status, error)
     }

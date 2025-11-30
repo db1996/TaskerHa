@@ -13,6 +13,7 @@ import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.TaskerConstants
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.ActualService
+import com.github.db1996.taskerha.datamodels.BuiltForm
 import com.github.db1996.taskerha.datamodels.FieldState
 import com.github.db1996.taskerha.datamodels.HaEntity
 import com.github.db1996.taskerha.datamodels.HomeassistantForm
@@ -38,6 +39,8 @@ class PluginConfigViewModel(
 
     var currentDomainSearch: String by mutableStateOf("")
     var currentServiceSearch: String by mutableStateOf("")
+    var pendingRestore: BuiltForm? = null
+
 
     fun loadServices(force: Boolean = false) {
         viewModelScope.launch {
@@ -49,8 +52,22 @@ class PluginConfigViewModel(
                 val result = withContext(Dispatchers.IO) {
                     client.getServicesFront(force)
                 }
+
+                if(result.isEmpty()){
+                    Log.e("HA", "No services found $result")
+                }
                 services = result
                 Log.d("HA", "Loaded services: ${services.size}")
+
+                services.forEach { service ->
+                    if(service.id == "select_option" && service.domain == "input_select"){
+                        Log.e("HA", "Found select_option service, $service")
+                    }
+                }
+                pendingRestore?.let {
+                    restoreForm(it.domain, it.service, it.entityId, it.data)
+                    pendingRestore = null
+                }
             } catch (e: Exception) {
                 Log.e("HA", "Failed to load services", e)
             }
@@ -85,8 +102,13 @@ class PluginConfigViewModel(
         form.dataContainer.clear()
         pservice.fields.forEach { field ->
             form.dataContainer[field.id] = FieldState()
+
+            if(field.required == true){
+                form.dataContainer[field.id]?.toggle?.value = true
+            }
         }
         Log.e("HA", "Picked service: ${pservice.id}, fields: ${pservice.fields.size}, form: ${form.domain}, form: ${form.service}")
+        Log.e("HA", "Form data: ${form.dataContainer}")
 
     }
 
@@ -136,61 +158,61 @@ class PluginConfigViewModel(
         }
     }
 
-    fun saveFormToTasker(activity: ComponentActivity) {
+    fun buildForm(): BuiltForm {
         val domain = form.domain
         val service = form.service
         val entityId = form.entityId
 
+        // Only selected fields
         val data = form.dataContainer
             .filter { it.value.toggle.value }
             .mapValues { it.value.value.value }
 
-        Log.d("HA", "Saving form: $domain, $service, $entityId, $data")
+        // Build consistent blurb
+        var msg = "Call Home Assistant: $domain.$service"
+        if (entityId.isNotBlank()) {
+            msg += " on $entityId"
+        }
 
-        viewModelScope.launch {
-            try {
+        return BuiltForm(
+            domain = domain,
+            service = service,
+            entityId = entityId,
+            data = data,
+            blurb = msg
+        )
+    }
 
-                val jsonData = Json.Default.encodeToString(
-                    MapSerializer(
-                        String.Companion.serializer(),
-                        String.serializer()
-                    ), data.mapValues { it.value })
+    fun restoreForm(domain: String, service: String, entity: String, dataMap: Map<String, String>) {
+        val pservice = services.find { it.domain == domain && it.id == service }
 
-                // --- RETURN TO TASKER ---
-                val bundle = Bundle().apply {
-                    putString("DOMAIN", domain)
-                    putString("SERVICE", service)
-                    putString("ENTITY_ID", entityId)
-                    putSerializable("DATA", jsonData)
+        if (pservice == null) {
+            // Not loaded yet → store for later
+            pendingRestore = BuiltForm(domain, service, entity, dataMap, "")
+            return
+        }
+
+        Log.e("HA", "Restoring form: $domain, $service, $entity, $dataMap")
+        // Services loaded: perform the restoration
+        selectedService = pservice
+
+        form = HomeassistantForm().apply {
+            this.domain = domain
+            this.service = service
+            this.entityId = entity
+
+            dataContainer.clear()
+            pservice.fields.forEach { field ->
+                val state = FieldState()
+                if (dataMap.containsKey(field.id)) {
+                    state.value.value = dataMap[field.id].orEmpty()
+                    state.toggle.value = true
                 }
-
-                val resultIntent = Intent().apply {
-                    putExtra(TaskerConstants.EXTRA_BUNDLE, bundle)
-                    var msg = "Call Home Assistant: $domain.$service"
-                    if(entityId.isNotBlank()) {
-                        msg += " on $entityId"
-                    }
-
-                    putExtra(
-                        TaskerConstants.EXTRA_BLURB,
-                        msg
-                    )
+                if(field.required == true){
+                    state.toggle.value = true
                 }
-
-                // If the service call succeeded, return RESULT_OK, otherwise RESULT_CANCELED
-                activity.setResult(
-                    Activity.RESULT_OK,
-                    resultIntent
-                )
-                activity.finish()
-
-            } catch (e: Exception) {
-                Log.e("HA", "Error calling service", e)
-                // Return failure to Tasker
-                activity.setResult(Activity.RESULT_CANCELED)
-                activity.finish()
+                dataContainer[field.id] = state
             }
         }
     }
-
 }

@@ -89,7 +89,10 @@ fun EntitySelector(
                                 color = Color.Gray,
                                 shape = RoundedCornerShape(8.dp)
                             )
-                            .background(color = Color(0xFFF5F5F5), shape = RoundedCornerShape(8.dp))
+                            .background(
+                                color = Color(0xFFF5F5F5),
+                                shape = RoundedCornerShape(8.dp)
+                            )
                             .clickable {
                                 onEntitySelected(entity.entity_id)
                                 onSearchChanged(false)
@@ -97,7 +100,7 @@ fun EntitySelector(
                             }
                             .padding(12.dp)
                     ) {
-                        Text(text = entity.entity_id, fontSize = 14.sp)
+                        Text(text = entity.entity_id, fontSize = 14.sp, color = Color.Black)
                     }
                 }
 

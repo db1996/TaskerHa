@@ -12,17 +12,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.github.db1996.taskerha.activities.screens.MainSettingsScreen
+import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 
 class MainActivity : ComponentActivity() {
@@ -67,20 +70,28 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(hasNotificationPermission: Boolean, onPermissionRequest: () -> Unit) {
+    var topBarContent by remember { mutableStateOf<@Composable () -> Unit>({}) }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        topBar = { topBarContent() },
         bottomBar = {
             // Only show the bottom bar if the permission is NOT granted
             if (!hasNotificationPermission) {
                 NotificationPermissionBar(onPermissionRequest = onPermissionRequest)
             }
         }
-    ) { _ ->
-        MainSettingsScreen()
+    ) { padding ->
+        MainSettingsScreen(
+            modifier = Modifier.padding(padding),
+            setTopBar = {  topBarContent = it }
+        )
     }
 }
+
 
 @Composable
 fun NotificationPermissionBar(onPermissionRequest: () -> Unit) {

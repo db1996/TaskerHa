@@ -1,5 +1,6 @@
 package com.github.db1996.taskerha.client
 
+import android.util.Log
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaDomainService
 import com.github.db1996.taskerha.datamodels.HaEntity
@@ -191,8 +192,13 @@ class HomeAssistantClient(
             targetEntity = hasEntityTarget
         )
 
+
         haService.fields?.forEach { (id, fieldData) ->
             if (id != "advanced_fields") convertField(fieldData, id)?.let { actualService.fields += it }
+        }
+
+        if(actualService.id == "tree_patch" && actualService.domain == "runelite"){
+            Log.e("HA", "Found tree_patch service, $haService")
         }
 
         return actualService
@@ -220,37 +226,57 @@ class HomeAssistantClient(
 
         if (fieldData.type == null) {
             val selector = field["selector"]?.jsonObject
-            selector?.forEach { (type, value) ->
-                when (type) {
-                    "text" -> fieldData.type = HaServiceFieldType.TEXT
-                    "boolean" -> fieldData.type = HaServiceFieldType.BOOLEAN
-                    "entity" -> fieldData.type = HaServiceFieldType.TEXT
-                    "select" -> {
-                        fieldData.type = HaServiceFieldType.SELECT
-                        fieldData.options = mutableListOf()
-                        val options = value.jsonObject["options"]?.jsonArray
-                        options?.forEach {
-                            if (it is JsonPrimitive) {
-                                fieldData.options!!.add(Option(it.content, it.content))
-                            } else {
-                                val obj = it.jsonObject
-                                fieldData.options!!.add(
-                                    Option(
-                                        obj["label"]!!.jsonPrimitive.content,
-                                        obj["value"]!!.jsonPrimitive.content
-                                    )
-                                )
-                            }
+            selector?.let { sel ->
+                HaServiceFieldType.entries.forEach { t ->
+                    val selectorElement = sel[t.name.lowercase()] ?: return@forEach
+                    val obj = (selectorElement as? JsonObject) ?: return@forEach
+                    when (t) {
+                        HaServiceFieldType.TEXT -> {
+                            fieldData.type = HaServiceFieldType.TEXT
                         }
-                    }
-                    "number", "color_temp", "color_rgb" -> {
-                        fieldData.type = HaServiceFieldType.NUMBER
-                        value.jsonObject["min"]?.jsonPrimitive?.doubleOrNull?.let { fieldData.min = it }
-                        value.jsonObject["max"]?.jsonPrimitive?.doubleOrNull?.let { fieldData.max = it }
-                        value.jsonObject["unit"]?.jsonPrimitive?.contentOrNull?.let { fieldData.unit_of_measurement = it }
+
+                        HaServiceFieldType.BOOLEAN -> {
+                            fieldData.type = HaServiceFieldType.BOOLEAN
+                        }
+
+                        HaServiceFieldType.SELECT -> {
+                            fieldData.type = HaServiceFieldType.SELECT
+                            val optionsArray = obj["options"]?.jsonArray ?: JsonArray(emptyList())
+                            fieldData.options = optionsArray.map { item ->
+                                if (item is JsonPrimitive) {
+                                    Option(item.content, item.content)
+                                }else{
+                                    Option(
+                                        item.toString(),
+                                        item.toString()
+                                    )
+                                }
+                            }.toMutableList()
+                            if(fieldData.name == "Tree type" && fieldData.id == "crop_type"){
+                                Log.e("HA", "Found crop_type field, ${fieldData.options}")
+                            }
+
+                            if(fieldData.options?.isEmpty() ?: true){
+                                fieldData.type = HaServiceFieldType.TEXT
+                            }
+
+                        }
+
+                        HaServiceFieldType.NUMBER -> {
+                            fieldData.type = HaServiceFieldType.NUMBER
+                            fieldData.min = obj["min"]?.jsonPrimitive?.doubleOrNull
+                            fieldData.max = obj["max"]?.jsonPrimitive?.doubleOrNull
+                            fieldData.unit_of_measurement =
+                                obj["unit"]?.jsonPrimitive?.contentOrNull
+                                    ?: obj["unit_of_measurement"]?.jsonPrimitive?.contentOrNull
+                        }
+
+                        else -> fieldData.type = HaServiceFieldType.TEXT
                     }
                 }
             }
+
+
         }
 
         return fieldData.type?.let { fieldData }

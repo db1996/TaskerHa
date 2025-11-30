@@ -4,4 +4,5 @@
     <string name="notification_channel_error_description">Shows notifications for errors from the
         TaskerHA plugin.
     </string>
+    <string name="title_activity_main2">MainActivity2</string>
 </resources>

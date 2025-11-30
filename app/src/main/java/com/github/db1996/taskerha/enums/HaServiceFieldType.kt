@@ -7,5 +7,6 @@ enum class HaServiceFieldType {
     NUMBER,
     DATE,
     TIME,
-    DATETIME
+    DATETIME,
+    STATE
 }
