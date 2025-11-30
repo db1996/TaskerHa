@@ -30,7 +30,7 @@ object NotificationHelper {
     }
 
     fun showErrorNotification(context: Context, title: String, content: String) {
-        // First, check if permission to post notifications
+        // Check if app has notifications permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ActivityCompat.checkSelfPermission(
                     context,
