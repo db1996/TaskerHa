@@ -37,8 +37,8 @@ class PluginConfigActivity : AppCompatActivity() {
             val service = savedInstanceState.getString("SERVICE") ?: return
             val entity = savedInstanceState.getString("ENTITY_ID") ?: return
             val dataJson = savedInstanceState.getString("DATA") ?: "{}"
-            val dataMap: Map<String, Any> = Json.Default.decodeFromString(
-                MapSerializer(String.Companion.serializer(), String.serializer()),
+            val dataMap: Map<String, Any> = Json.decodeFromString(
+                MapSerializer(String.serializer(), String.serializer()),
                 dataJson
             ).mapValues { it.value as Any }
 
