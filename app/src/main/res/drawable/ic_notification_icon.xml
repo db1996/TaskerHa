@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Fallback icon for API < 26.
+This uses a layer-list to simply display the foreground drawable.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:width="24dp"
+        android:height="24dp"
+        android:gravity="center" />
+</layer-list>

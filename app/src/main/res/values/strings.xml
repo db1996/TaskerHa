@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">TaskerHa</string>
+    <string name="notification_channel_error_name">Plugin Errors</string>
+    <string name="notification_channel_error_description">Shows notifications for errors from the
+        TaskerHA plugin.
+    </string>
+</resources>
