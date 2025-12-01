@@ -6,17 +6,19 @@ import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import com.github.db1996.taskerha.TaskerConstants.EXTRA_BLURB
+import com.github.db1996.taskerha.TaskerConstants.EXTRA_BUNDLE
 import com.github.db1996.taskerha.activities.screens.PluginConfigScreen
-import com.github.db1996.taskerha.TaskerConstants
-import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.datamodels.FieldState
-import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModel
 import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModelFactory
+import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.tasker.TaskerPlugin
+import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+
 class PluginConfigActivity : AppCompatActivity() {
 
     private val client by lazy {
@@ -32,12 +34,21 @@ class PluginConfigActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val bundle = intent.getBundleExtra(TaskerConstants.EXTRA_BUNDLE)
+        // Use TaskerPlugin helper to get existing bundle when editing
+        val callingIntent = intent
+        val existingBundle = intent.getBundleExtra(EXTRA_BUNDLE)
 
-        if(bundle == null){
-            Log.e("PluginConfigActivity", "onCreate, bundle is null")
-        }else{
-            restoreStateIfNeeded(bundle)
+        if (existingBundle == null) {
+            Log.d("PluginConfigActivity-logcat", "No existing bundle (new action)")
+        } else {
+            restoreStateIfNeeded(existingBundle)
+        }
+        if (TaskerPlugin.hostSupportsRelevantVariables(intent.extras)) {
+            val passedNames = TaskerPlugin.getRelevantVariableList(intent.extras)
+
+            for (name in passedNames) {
+                Log.e("PluginConfigActivity-logcat", "Relevant variable: $name")
+            }
         }
 
         setContent {
@@ -56,16 +67,45 @@ class PluginConfigActivity : AppCompatActivity() {
                     }
 
                     val msg = buildString {
-                        append("Call Home Assistant: $domain.$service")
-                        if (entityId.isNotBlank()) append(" on $entityId")
+                        append("Domain: $domain\nService: $service")
+                        if (entityId.isNotBlank()) append("\nEntity ID: $entityId")
+
+                        if (data.isNotEmpty()) {
+                            append("\nData:\n")
+                            data.forEach { (key, value) ->
+                                append("- $key: $value\n")
+                            }
+                        }
                     }
 
-                    val result = Intent().apply {
-                        putExtra(TaskerConstants.EXTRA_BUNDLE, bundle)
-                        putExtra(TaskerConstants.EXTRA_BLURB, msg)
+                    val resultIntent = Intent().apply {
+                        // Put the bundle via Tasker’s expected key
+                        putExtra(EXTRA_BUNDLE, bundle)
+                        // Blurb
+                        putExtra(EXTRA_BLURB, msg)
                     }
 
-                    setResult(RESULT_OK, result)
+                    // Ask Tasker to run this synchronously (ordered broadcast)
+                    if (TaskerPlugin.Setting.hostSupportsSynchronousExecution(callingIntent.extras)) {
+                        Log.e("PluginConfigActivity-logcat", "Running synchronously")
+                        // e.g. 10 seconds, adjust as needed
+                        TaskerPlugin.Setting.requestTimeoutMS(resultIntent, 10_000)
+                    }
+
+                    // Optional: declare relevant variables (like %err)
+                    if (TaskerPlugin.hostSupportsRelevantVariables(callingIntent.extras)) {
+                        Log.e("PluginConfigActivity-logcat", "Adding relevant variables")
+                        TaskerPlugin.addRelevantVariableList(
+                            resultIntent,
+                            arrayOf(
+                                // name \n label \n description (HTML allowed)
+                                "%err\nError Code\nError code returned by TaskerHA",
+                                "%errmsg\nError Message\nHuman-readable error from Home Assistant"
+                            )
+                        )
+                    }
+
+                    setResult(RESULT_OK, resultIntent)
                     finish()
                 }
             }

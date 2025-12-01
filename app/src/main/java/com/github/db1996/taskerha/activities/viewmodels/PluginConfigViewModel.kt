@@ -169,10 +169,7 @@ class PluginConfigViewModel(
             .mapValues { it.value.value.value }
 
         // Build consistent blurb
-        var msg = "Call Home Assistant: $domain.$service"
-        if (entityId.isNotBlank()) {
-            msg += " on $entityId"
-        }
+        var msg = ""
 
         return BuiltForm(
             domain = domain,
