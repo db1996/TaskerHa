@@ -29,6 +29,9 @@ class PluginReceiver : BroadcastReceiver() {
             return
         }
 
+        Log.e("PluginReceiver", "Timeout hint = " +
+                TaskerPlugin.Setting.getHintTimeoutMS(intent.extras))
+        Log.e("PluginReceiver", "Component = ${intent.component}")
         CoroutineScope(Dispatchers.IO).launch {
 
             try {
@@ -85,13 +88,11 @@ class PluginReceiver : BroadcastReceiver() {
     ) {
         Log.e("PluginReceiver", message)
         NotificationHelper.showErrorNotification(context, "TaskerHA Error", message)
-
         if (!ordered) return  // Tasker only reads results from ORDERED broadcasts
 
-        pending.resultCode = TaskerPlugin.Setting.RESULT_CODE_FAILED
-        pending.setResultData(message)
+        Log.e("PluginReceiver", "Reporting error to Tasker")
 
-        // add Tasker variables like %err and %errmsg
+        pending.resultCode = TaskerPlugin.Setting.RESULT_CODE_FAILED// add Tasker variables like %err and %errmsg
         if (TaskerPlugin.Setting.hostSupportsVariableReturn(originalExtras)) {
             Log.e("PluginReceiver", "Adding Tasker variables")
             val vars = Bundle().apply {
@@ -106,6 +107,7 @@ class PluginReceiver : BroadcastReceiver() {
             val extras = pending.getResultExtras(true)
             TaskerPlugin.addVariableBundle(extras, vars)
         }
+        pending.setResultData(message)
     }
 
     // ---------------------------------------------------------

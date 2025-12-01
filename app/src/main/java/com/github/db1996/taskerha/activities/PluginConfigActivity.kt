@@ -105,6 +105,18 @@ class PluginConfigActivity : AppCompatActivity() {
                         )
                     }
 
+                    if (TaskerPlugin.Setting.hostSupportsVariableReturn(callingIntent.extras)) {
+                        Log.e("PluginConfigActivity-logcat", "Adding variable return variables")
+                        TaskerPlugin.Setting.setVariableReplaceKeys(
+                            bundle,
+                            arrayOf(
+                                // name \n label \n description (HTML allowed)
+                                "com.github.db1996.taskerha.ERR",
+                                "com.github.db1996.taskerha.ERRMSG"
+                            )
+                        )
+                    }
+
                     setResult(RESULT_OK, resultIntent)
                     finish()
                 }
