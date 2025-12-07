@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.activities
+package com.github.db1996.taskerha
 
 import android.content.Intent
 import android.os.Bundle
@@ -6,8 +6,6 @@ import android.util.Log
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import com.github.db1996.taskerha.TaskerConstants.EXTRA_BLURB
-import com.github.db1996.taskerha.TaskerConstants.EXTRA_BUNDLE
 import com.github.db1996.taskerha.activities.screens.PluginConfigScreen
 import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModel
 import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModelFactory
@@ -34,12 +32,11 @@ class PluginConfigActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Use TaskerPlugin helper to get existing bundle when editing
         val callingIntent = intent
-        val existingBundle = intent.getBundleExtra(EXTRA_BUNDLE)
+        val existingBundle = intent.getBundleExtra(TaskerConstants.EXTRA_BUNDLE)
 
         if (existingBundle == null) {
-            Log.d("PluginConfigActivity-logcat", "No existing bundle (new action)")
+            Log.d("PluginConfigActivity", "No existing bundle (new action)")
         } else {
             restoreStateIfNeeded(existingBundle)
         }
@@ -47,15 +44,15 @@ class PluginConfigActivity : AppCompatActivity() {
             val passedNames = TaskerPlugin.getRelevantVariableList(intent.extras)
 
             for (name in passedNames) {
-                Log.e("PluginConfigActivity-logcat", "Relevant variable: $name")
+                Log.e("PluginConfigActivity", "Relevant variable: $name")
             }
         }
 
         setContent {
             TaskerHaTheme {
                 PluginConfigScreen(viewModel) { domain, service, entityId, data ->
-                    val jsonData = Json.encodeToString(
-                        MapSerializer(String.serializer(), String.serializer()),
+                    val jsonData = Json.Default.encodeToString(
+                        MapSerializer(String.Companion.serializer(), String.serializer()),
                         data
                     )
 
@@ -80,39 +77,24 @@ class PluginConfigActivity : AppCompatActivity() {
 
                     val resultIntent = Intent().apply {
                         // Put the bundle via Tasker’s expected key
-                        putExtra(EXTRA_BUNDLE, bundle)
+                        putExtra(TaskerConstants.EXTRA_BUNDLE, bundle)
                         // Blurb
-                        putExtra(EXTRA_BLURB, msg)
+                        putExtra(TaskerConstants.EXTRA_BLURB, msg)
                     }
 
-                    // Ask Tasker to run this synchronously (ordered broadcast)
                     if (TaskerPlugin.Setting.hostSupportsSynchronousExecution(callingIntent.extras)) {
-                        Log.e("PluginConfigActivity-logcat", "Running synchronously")
+                        Log.e("PluginConfigActivity", "Running synchronously")
                         // e.g. 10 seconds, adjust as needed
                         TaskerPlugin.Setting.requestTimeoutMS(resultIntent, 10_000)
                     }
 
-                    // Optional: declare relevant variables (like %err)
                     if (TaskerPlugin.hostSupportsRelevantVariables(callingIntent.extras)) {
-                        Log.e("PluginConfigActivity-logcat", "Adding relevant variables")
+                        Log.e("PluginConfigActivity", "Adding relevant variables")
                         TaskerPlugin.addRelevantVariableList(
                             resultIntent,
                             arrayOf(
-                                // name \n label \n description (HTML allowed)
                                 "%err\nError Code\nError code returned by TaskerHA",
                                 "%errmsg\nError Message\nHuman-readable error from Home Assistant"
-                            )
-                        )
-                    }
-
-                    if (TaskerPlugin.Setting.hostSupportsVariableReturn(callingIntent.extras)) {
-                        Log.e("PluginConfigActivity-logcat", "Adding variable return variables")
-                        TaskerPlugin.Setting.setVariableReplaceKeys(
-                            bundle,
-                            arrayOf(
-                                // name \n label \n description (HTML allowed)
-                                "com.github.db1996.taskerha.ERR",
-                                "com.github.db1996.taskerha.ERRMSG"
                             )
                         )
                     }
@@ -132,7 +114,7 @@ class PluginConfigActivity : AppCompatActivity() {
         val entity = savedInstanceState.getString("ENTITY_ID") ?: return
 
         val dataJson = savedInstanceState.getString("DATA") ?: "{}"
-        val dataMap: Map<String, String> = Json.decodeFromString(
+        val dataMap: Map<String, String> = Json.Default.decodeFromString(
             MapSerializer(String.serializer(), String.serializer()),
             dataJson
         )

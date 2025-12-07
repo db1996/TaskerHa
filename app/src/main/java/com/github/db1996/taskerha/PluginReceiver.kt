@@ -1,30 +1,30 @@
-package com.github.db1996.taskerha.activities
+package com.github.db1996.taskerha
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
-import com.github.db1996.taskerha.NotificationHelper
-import com.github.db1996.taskerha.TaskerConstants.EXTRA_BUNDLE
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.tasker.TaskerPlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import com.github.db1996.taskerha.tasker.TaskerPlugin
 
 class PluginReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
 
-        val pending = goAsync()
         val ordered = isOrderedBroadcast
+        val pending = goAsync()
 
-        val bundle = intent.getBundleExtra(EXTRA_BUNDLE) ?: run {
+        Log.e("PluginReceiver", "isOrderedBroadcast = $isOrderedBroadcast")
+
+        val bundle = intent.getBundleExtra(TaskerConstants.EXTRA_BUNDLE) ?: run {
             pending.finish()
             return
         }
@@ -117,8 +117,8 @@ class PluginReceiver : BroadcastReceiver() {
         val json = bundle.getString("DATA") ?: return emptyMap()
 
         return try {
-            Json.decodeFromString(
-                MapSerializer(String.serializer(), String.serializer()),
+            Json.Default.decodeFromString(
+                MapSerializer(String.Companion.serializer(), String.serializer()),
                 json
             ).mapValues { it.value as Any }
         } catch (e: Exception) {
