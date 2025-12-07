@@ -7,10 +7,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.datamodels.HaCallServiceBuiltForm
+import com.github.db1996.taskerha.tasker.callservice.data.HaCallServiceBuiltForm
 import com.github.db1996.taskerha.datamodels.HaEntity
-import com.github.db1996.taskerha.datamodels.HaGetStateBuiltForm
-import com.github.db1996.taskerha.datamodels.HaGetStateForm
+import com.github.db1996.taskerha.tasker.getstate.data.HaGetStateBuiltForm
+import com.github.db1996.taskerha.tasker.getstate.data.HaGetStateForm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -73,7 +73,6 @@ class HaGetStateViewModel(
     fun buildForm(): HaGetStateBuiltForm {
         val entityId = form.entityId
 
-        // Build consistent blurb
         var msg = ""
 
         return HaGetStateBuiltForm(

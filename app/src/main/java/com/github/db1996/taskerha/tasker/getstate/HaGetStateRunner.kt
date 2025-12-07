@@ -1,5 +1,4 @@
-// HaGetStateRunner.kt
-package com.github.db1996.taskerha.tasker
+package com.github.db1996.taskerha.tasker.getstate
 
 import android.content.Context
 import android.util.Log
@@ -19,7 +18,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOutput>() {
-
     override fun run(
         context: Context,
         input: TaskerInput<HaGetStateInput>
@@ -34,13 +32,13 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
                     HaSettings.loadToken(context)
                 )
 
-                // Optional but nice: ping first, like in your Call Service runner
                 if (!client.ping()) {
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
                         1,
                         client.error
                     )
                 }
+
                 Log.e("HaGetStateRunner", "Pinged, ${params.entityId}")
                 val ok = client.getState(params.entityId)
                 if (!ok) {
@@ -52,21 +50,19 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
 
                 val rawJson = client.result
 
-                // Parse JSON
-                val jsonElement = Json.parseToJsonElement(rawJson)
+                val jsonElement = Json.Default.parseToJsonElement(rawJson)
                 val obj: JsonObject = jsonElement.jsonObject
 
                 val state = obj["state"]?.jsonPrimitive?.content ?: ""
 
                 val attrsAny = obj["attributes"]?.jsonObject ?: JsonObject(emptyMap())
 
-                // Convert attributes to Map<String, String> for Tasker
                 val attrsMap: Map<String, String> = attrsAny.mapValues { (_, value) ->
                     value.toString().trim('"')
                 }
 
-                val attrsJson = Json.encodeToString(
-                    MapSerializer(String.serializer(), String.serializer()),
+                val attrsJson = Json.Default.encodeToString(
+                    MapSerializer(String.Companion.serializer(), String.serializer()),
                     attrsMap
                 )
 

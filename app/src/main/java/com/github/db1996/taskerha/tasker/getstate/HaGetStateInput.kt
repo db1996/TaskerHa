@@ -1,5 +1,4 @@
-// HaGetStateInput.kt
-package com.github.db1996.taskerha.tasker
+package com.github.db1996.taskerha.tasker.getstate
 
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
@@ -17,15 +16,12 @@ class HaGetStateInput {
 @TaskerOutputObject
 class HaGetStateOutput(
 
-    // Becomes %ha_state
     @get:TaskerOutputVariable("ha_state")
     val state: String,
 
-    // Becomes %ha_attrs
     @get:TaskerOutputVariable("ha_attrs")
     val attributesJson: String,
 
-    // Becomes %ha_raw
     @get:TaskerOutputVariable("ha_raw")
     val rawJson: String
 )

@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.tasker
+package com.github.db1996.taskerha.tasker.callservice
 
 import android.content.Context
 import android.util.Log
@@ -31,7 +31,6 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                     HaSettings.loadToken(context)
                 )
 
-                // 1. Ping
                 if (!client.ping()) {
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
                         1,
@@ -39,7 +38,6 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                     )
                 }
 
-                // 2. Parse Data JSON
                 val dataMap = try {
                     Json.Default.decodeFromString(
                         MapSerializer(String.serializer(), String.serializer()),
@@ -52,7 +50,6 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                     )
                 }
 
-                // 3. Call Service
                 val ok = client.callService(
                     params.domain,
                     params.service,
@@ -75,7 +72,6 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                 )
             }
 
-            // ✅ Success: Tasker gets %ha_data from this object
             TaskerPluginResultSucess(
                 HaCallServiceOutput(
                     dataJson = result

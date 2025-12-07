@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.tasker
+package com.github.db1996.taskerha.tasker.callservice
 
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
@@ -11,14 +11,4 @@ class HaCallServiceConfigHelper(
     override val runnerClass = HaCallServiceRunner::class.java
     override val inputClass = HaCallServiceInput::class.java
     override val outputClass = HaCallServiceOutput::class.java
-
-    override fun addToStringBlurb(
-        input: TaskerInput<HaCallServiceInput>,
-        blurbBuilder: StringBuilder
-    ) {
-//        blurbBuilder.append("Service: ${input.regular.domain}.${input.regular.service}")
-//        if (input.regular.entityId.isNotEmpty()) {
-//            blurbBuilder.append("\nEntity: ${input.regular.entityId}")
-//        }
-    }
 }

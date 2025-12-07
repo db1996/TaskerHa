@@ -1,4 +1,4 @@
-package com.github.db1996.taskerha.datamodels
+package com.github.db1996.taskerha.tasker.getstate.data
 
 data class HaGetStateForm(
     var entityId: String = ""

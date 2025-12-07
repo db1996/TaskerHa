@@ -8,10 +8,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.ActualService
-import com.github.db1996.taskerha.datamodels.HaCallServiceBuiltForm
-import com.github.db1996.taskerha.datamodels.FieldState
+import com.github.db1996.taskerha.tasker.callservice.data.HaCallServiceBuiltForm
+import com.github.db1996.taskerha.tasker.callservice.data.FieldState
 import com.github.db1996.taskerha.datamodels.HaEntity
-import com.github.db1996.taskerha.datamodels.HomeassistantForm
+import com.github.db1996.taskerha.tasker.callservice.data.HomeassistantForm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext

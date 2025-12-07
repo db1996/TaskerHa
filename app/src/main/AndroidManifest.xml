@@ -21,7 +21,7 @@
         android:theme="@style/Theme.TaskerHa">
 
         <activity
-            android:name=".tasker.PluginConfigActivity"
+            android:name=".tasker.callservice.HaCallServiceActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="HA Call Service">
@@ -31,7 +31,7 @@
         </activity>
 
         <activity
-            android:name=".tasker.GetStateConfigActivity"
+            android:name=".tasker.getstate.GetStateConfigActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="HA Get State">

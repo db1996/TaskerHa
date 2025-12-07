@@ -1,5 +1,4 @@
-// HaGetStateConfigHelper.kt
-package com.github.db1996.taskerha.tasker
+package com.github.db1996.taskerha.tasker.getstate
 
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
@@ -12,9 +11,4 @@ class HaGetStateConfigHelper(
     override val runnerClass = HaGetStateRunner::class.java
     override val inputClass = HaGetStateInput::class.java
     override val outputClass = HaGetStateOutput::class.java
-
-    override fun addToStringBlurb(
-        input: TaskerInput<HaGetStateInput>,
-        blurbBuilder: StringBuilder
-    ) {}
 }

@@ -18,7 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.github.db1996.taskerha.datamodels.FieldState
+import com.github.db1996.taskerha.tasker.callservice.data.FieldState
 import com.github.db1996.taskerha.datamodels.HaServiceField
 import com.github.db1996.taskerha.enums.HaServiceFieldType
 
