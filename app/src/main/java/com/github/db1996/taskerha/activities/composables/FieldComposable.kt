@@ -55,7 +55,7 @@ fun FieldInput(
             }
 
             HaServiceFieldType.NUMBER -> {
-                FieldNumberInput(
+                FieldTextInput(
                     field = field,
                     state = state,
                     onValueChange = onValueChange,
