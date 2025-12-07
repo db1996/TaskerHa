@@ -2,9 +2,11 @@ package com.github.db1996.taskerha.tasker
 
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
+import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputObject
+import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
-class HaPluginInput {
+class HaCallServiceInput {
     @field:TaskerInputField("domain")
     var domain: String = ""
 
@@ -19,3 +21,11 @@ class HaPluginInput {
     @field:TaskerInputField("dataJson")
     var dataJson: String = "{}"
 }
+
+@TaskerOutputObject
+class HaCallServiceOutput(
+
+    // This becomes %ha_data in Tasker (Tasker adds the %)
+    @get:TaskerOutputVariable("ha_data")
+    val dataJson: String
+)

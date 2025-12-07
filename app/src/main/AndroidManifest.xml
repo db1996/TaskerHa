@@ -20,17 +20,25 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TaskerHa">
 
-        <!-- Config Activity for the Tasker action -->
         <activity
-            android:name=".PluginConfigActivity"
+            android:name=".tasker.PluginConfigActivity"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher">
+            android:icon="@mipmap/ic_launcher"
+            android:label="HA Call Service">
             <intent-filter>
                 <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
             </intent-filter>
         </activity>
 
-        <!-- NO receiver here for HaActionRunner -->
+        <activity
+            android:name=".tasker.GetStateConfigActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="HA Get State">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+            </intent-filter>
+        </activity>
 
         <activity
             android:name=".activities.MainActivity"

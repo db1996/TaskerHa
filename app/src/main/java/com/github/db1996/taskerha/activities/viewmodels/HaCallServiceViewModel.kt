@@ -1,30 +1,22 @@
 package com.github.db1996.taskerha.activities.viewmodels
 
-import android.app.Activity
-import android.content.Intent
-import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.github.db1996.taskerha.TaskerConstants
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.ActualService
-import com.github.db1996.taskerha.datamodels.BuiltForm
+import com.github.db1996.taskerha.datamodels.HaCallServiceBuiltForm
 import com.github.db1996.taskerha.datamodels.FieldState
 import com.github.db1996.taskerha.datamodels.HaEntity
 import com.github.db1996.taskerha.datamodels.HomeassistantForm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.json.Json
 
-class PluginConfigViewModel(
+class HaCallServiceViewModel(
     private val client: HomeAssistantClient
 ) : ViewModel() {
     var services: List<ActualService> by mutableStateOf(value = emptyList())
@@ -39,7 +31,7 @@ class PluginConfigViewModel(
 
     var currentDomainSearch: String by mutableStateOf("")
     var currentServiceSearch: String by mutableStateOf("")
-    var pendingRestore: BuiltForm? = null
+    var pendingRestore: HaCallServiceBuiltForm? = null
 
 
     fun loadServices(force: Boolean = false) {
@@ -158,7 +150,7 @@ class PluginConfigViewModel(
         }
     }
 
-    fun buildForm(): BuiltForm {
+    fun buildForm(): HaCallServiceBuiltForm {
         val domain = form.domain
         val service = form.service
         val entityId = form.entityId
@@ -171,7 +163,7 @@ class PluginConfigViewModel(
         // Build consistent blurb
         var msg = ""
 
-        return BuiltForm(
+        return HaCallServiceBuiltForm(
             domain = domain,
             service = service,
             entityId = entityId,
@@ -185,7 +177,7 @@ class PluginConfigViewModel(
 
         if (pservice == null) {
             // Not loaded yet → store for later
-            pendingRestore = BuiltForm(domain, service, entity, dataMap, "")
+            pendingRestore = HaCallServiceBuiltForm(domain, service, entity, dataMap, "")
             return
         }
 

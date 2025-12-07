@@ -7,11 +7,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class PluginConfigViewModelFactory(
+class HaGetStateViewModelFactory(
     private val client: HomeAssistantClient
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(PluginConfigViewModel::class.java)) {
+        if (modelClass.isAssignableFrom(HaGetStateViewModel::class.java)) {
             CoroutineScope(Dispatchers.IO).launch {
                 val successPing = client.ping()
                 if(!successPing){
@@ -23,7 +23,7 @@ class PluginConfigViewModelFactory(
 
             }
             @Suppress("UNCHECKED_CAST")
-            return PluginConfigViewModel(client) as T
+            return HaGetStateViewModel(client) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -33,7 +33,11 @@ fun EntitySelector(
         else {
             entities
                 .asSequence()
-                .filter { it.entity_id.startsWith("$serviceDomain.") }
+                .filter {
+                    it.entity_id.startsWith("$serviceDomain.") || it.entity_id.split(".").first()
+                        .lowercase()
+                        .contains(serviceDomain.lowercase())
+                }
                 .filter { it.entity_id.contains(searchQuery, ignoreCase = true) }
                 .toList()
         }

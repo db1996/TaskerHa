@@ -14,11 +14,11 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
-class HaActionRunner : TaskerPluginRunnerAction<HaPluginInput, HaCallServiceOutput>() {
+class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallServiceOutput>() {
 
     override fun run(
         context: Context,
-        input: TaskerInput<HaPluginInput>
+        input: TaskerInput<HaCallServiceInput>
     ): TaskerPluginResult<HaCallServiceOutput> {
 
         return runBlocking {

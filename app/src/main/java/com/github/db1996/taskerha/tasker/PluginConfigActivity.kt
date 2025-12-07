@@ -1,17 +1,15 @@
-package com.github.db1996.taskerha
+package com.github.db1996.taskerha.tasker
 
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import com.github.db1996.taskerha.activities.screens.PluginConfigScreen
-import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModel
-import com.github.db1996.taskerha.activities.viewmodels.PluginConfigViewModelFactory
+import com.github.db1996.taskerha.activities.screens.HaCallServiceScreen
+import com.github.db1996.taskerha.activities.viewmodels.HaCallServiceViewModel
+import com.github.db1996.taskerha.activities.viewmodels.HaCallServiceViewModelFactory
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.tasker.HaConfigHelper
-import com.github.db1996.taskerha.tasker.HaPluginInput
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
@@ -21,7 +19,7 @@ import kotlinx.serialization.json.Json
 
 class PluginConfigActivity :
     AppCompatActivity(),
-    TaskerPluginConfig<HaPluginInput> {   // ✅ add type argument here
+    TaskerPluginConfig<HaCallServiceInput> {   // ✅ add type argument here
 
     // --- TaskerPluginConfig requirement ---
     override val context: Context
@@ -33,12 +31,12 @@ class PluginConfigActivity :
         HomeAssistantClient(url, token)
     }
 
-    private val viewModel: PluginConfigViewModel by viewModels {
-        PluginConfigViewModelFactory(client)
+    private val viewModel: HaCallServiceViewModel by viewModels {
+        HaCallServiceViewModelFactory(client)
     }
 
     // Helper that bridges this Activity <-> Tasker <-> Runner
-    private val taskerHelper by lazy { HaConfigHelper(this) }
+    private val taskerHelper by lazy { HaCallServiceConfigHelper(this) }
 
     // Values that will be sent back to Tasker
     private var selectedDomain: String = ""
@@ -54,7 +52,7 @@ class PluginConfigActivity :
 
         setContent {
             TaskerHaTheme {
-                PluginConfigScreen(viewModel) { domain, service, entityId, data ->
+                HaCallServiceScreen(viewModel) { domain, service, entityId, data ->
                     // 1. Save latest UI values
                     selectedDomain = domain
                     selectedService = service
@@ -73,7 +71,7 @@ class PluginConfigActivity :
      * Called by the helper when editing an existing Tasker action.
      * Convert TaskerInput -> local fields -> restore the UI.
      */
-    override fun assignFromInput(input: TaskerInput<HaPluginInput>) { // ✅ typed input
+    override fun assignFromInput(input: TaskerInput<HaCallServiceInput>) { // ✅ typed input
         val params = input.regular
 
         selectedDomain = params.domain
@@ -82,7 +80,7 @@ class PluginConfigActivity :
 
         val dataMap: Map<String, String> = try {
             Json.Default.decodeFromString(
-                MapSerializer(String.serializer(), String.serializer()),
+                MapSerializer(String.Companion.serializer(), String.serializer()),
                 params.dataJson
             )
         } catch (_: Exception) {
@@ -103,14 +101,14 @@ class PluginConfigActivity :
     /**
      * Called by the helper when it needs the final input to send back to Tasker.
      */
-    override val inputForTasker: TaskerInput<HaPluginInput>   // ✅ typed TaskerInput
+    override val inputForTasker: TaskerInput<HaCallServiceInput>   // ✅ typed TaskerInput
         get() {
             val jsonData = Json.Default.encodeToString(
                 MapSerializer(String.serializer(), String.serializer()),
                 selectedData
             )
 
-            val haInput = HaPluginInput().apply {
+            val haInput = HaCallServiceInput().apply {
                 domain = selectedDomain
                 service = selectedService
                 entityId = selectedEntityId
