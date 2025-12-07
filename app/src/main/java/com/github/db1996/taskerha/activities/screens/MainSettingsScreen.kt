@@ -9,6 +9,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -121,6 +122,14 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
         }
 
         StatusRow(status, error)
+        Button(
+                onClick = {
+                    // Manually fire the Tasker event
+                    context.triggerOnTriggerState()
+                }
+                ) {
+            Text("Trigger OnTriggerState Tasker Event")
+        }
     }
 }
 

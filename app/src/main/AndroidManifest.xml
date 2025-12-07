@@ -49,5 +49,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".tasker.ontriggerstate.ActivityConfigOnTriggerState"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="HA On Trigger State">
+            <intent-filter>
+                <action android:name="net.dinglisch.android.tasker.ACTION_EDIT_EVENT" />
+            </intent-filter>
+        </activity>
+
     </application>
 </manifest>
