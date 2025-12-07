@@ -1,27 +1,29 @@
 package com.github.db1996.taskerha.tasker
 
 import android.content.Context
+import android.util.Log
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.joaomgcd.taskerpluginlibrary.action.TaskerPluginRunnerAction
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResult
-import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultError
+import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultErrorWithOutput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultSucess
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
-class HaActionRunner : TaskerPluginRunnerAction<HaPluginInput, Unit>() {
+class HaActionRunner : TaskerPluginRunnerAction<HaPluginInput, HaCallServiceOutput>() {
 
     override fun run(
         context: Context,
         input: TaskerInput<HaPluginInput>
-    ): TaskerPluginResult<Unit> {
+    ): TaskerPluginResult<HaCallServiceOutput> {
 
         return runBlocking {
             val params = input.regular
+            var result: String
 
             try {
                 val client = HomeAssistantClient(
@@ -31,9 +33,9 @@ class HaActionRunner : TaskerPluginRunnerAction<HaPluginInput, Unit>() {
 
                 // 1. Ping
                 if (!client.ping()) {
-                    return@runBlocking TaskerPluginResultError(
+                    return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
                         1,
-                        client.error ?: "Failed to ping Home Assistant"
+                        client.error
                     )
                 }
 
@@ -44,7 +46,10 @@ class HaActionRunner : TaskerPluginRunnerAction<HaPluginInput, Unit>() {
                         params.dataJson
                     ).mapValues { it.value as Any }
                 } catch (e: Exception) {
-                    return@runBlocking TaskerPluginResultError(2, "Invalid JSON Data: ${e.message}")
+                    return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
+                        2,
+                        "Invalid JSON Data: ${e.message}"
+                    )
                 }
 
                 // 3. Call Service
@@ -56,15 +61,26 @@ class HaActionRunner : TaskerPluginRunnerAction<HaPluginInput, Unit>() {
                 )
 
                 if (!ok) {
-                    return@runBlocking TaskerPluginResultError(3, client.error ?: "Service call failed")
+                    return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
+                        3,
+                        client.error
+                    )
                 }
-
+                Log.e("HA Runner", "Result: ${client.result}")
+                result = client.result
             } catch (e: Exception) {
-                return@runBlocking TaskerPluginResultError(4, e.message ?: "Unknown crash")
+                return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
+                    4,
+                    e.message ?: "Unknown crash"
+                )
             }
 
-            // Success (Note the spelling 'Sucess' is correct for this library)
-            return@runBlocking TaskerPluginResultSucess(Unit)
+            // ✅ Success: Tasker gets %ha_data from this object
+            TaskerPluginResultSucess(
+                HaCallServiceOutput(
+                    dataJson = result
+                )
+            )
         }
     }
 }

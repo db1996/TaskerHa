@@ -40,6 +40,7 @@ class HomeAssistantClient(
 
     var error: String = ""
     var homeAssistantStatus = HomeassistantStatus.NO_SETTINGS
+    var result: String = ""
     private var services: List<HaDomainService> = emptyList()
     private var entities: List<HaEntity> = emptyList()
 
@@ -137,6 +138,7 @@ class HomeAssistantClient(
             }
         }
 
+
     suspend fun getServicesFront(force: Boolean = false): List<ActualService> {
         val domainServices = getServices(force)
         return domainServices.flatMap { domain ->
@@ -146,6 +148,33 @@ class HomeAssistantClient(
         }
     }
 
+    suspend fun getState(entityId: String): Boolean =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
+
+            val req = request("/api/states/$entityId")
+
+            try {
+                val response = http.newCall(req).execute()
+                result = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    error =
+                        if (response.code == 401) "Unauthorized, check your token" else response.message
+                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                    false
+                } else {
+                    homeAssistantStatus = HomeassistantStatus.CONNECTED
+                    true
+                }
+            } catch (e: IOException) {
+                error = e.toString()
+                homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                false
+            }
+        }
+
+
+
     suspend fun callService(domain: String, service: String, entityId: String, data: Map<String, Any>? = null): Boolean =
         withContext(Dispatchers.IO) {
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
@@ -153,6 +182,8 @@ class HomeAssistantClient(
             val payload = mutableMapOf<String, Any>()
             if (entityId.isNotEmpty()) payload["entity_id"] = entityId
             data?.let { payload.putAll(it) }
+
+            Log.e("HA client", "Payload: $payload")
 
             val body = json.encodeToString(
                 MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
@@ -163,6 +194,7 @@ class HomeAssistantClient(
 
             try {
                 val response = http.newCall(req).execute()
+                result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
                     error =
                         if (response.code == 401) "Unauthorized, check your token" else response.message

@@ -5,14 +5,12 @@ import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 
 class HaConfigHelper(
-    config: TaskerPluginConfig<HaPluginInput>   // ✅ generic here too
-) : TaskerPluginConfigHelper<HaPluginInput, Unit, HaActionRunner>(config) {
+    config: TaskerPluginConfig<HaPluginInput>
+) : TaskerPluginConfigHelper<HaPluginInput, HaCallServiceOutput, HaActionRunner>(config) {
 
     override val runnerClass = HaActionRunner::class.java
     override val inputClass = HaPluginInput::class.java
-    override val outputClass = Unit::class.java
-
-    override val timeoutSeconds: Int = 10
+    override val outputClass = HaCallServiceOutput::class.java
 
     override fun addToStringBlurb(
         input: TaskerInput<HaPluginInput>,

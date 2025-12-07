@@ -5,4 +5,7 @@
         TaskerHA plugin.
     </string>
     <string name="title_activity_main2">MainActivity2</string>
+    <string name="ha_output_data">%ha_data</string>
+    <string name="ha_output_data_label">HA Data JSON</string>
+    <string name="ha_output_data_html_label"><b>HA Data JSON</b></string>
 </resources>
