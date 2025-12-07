@@ -40,12 +40,8 @@ fun FieldInput(
             checked = state.toggle.value || field.required == true,
             onCheckedChange = onToggleChange
         )
-
-        Log.e("FieldInput", "Field type: ${field.type}")
-
         when (field.type) {
             HaServiceFieldType.SELECT -> {
-                Log.e("FieldInput", "Select field: ${field.name}")
                 FieldSelectInput(
                     field = field,
                     state = state,
@@ -125,7 +121,6 @@ fun FieldSelectInput(
         expanded = expanded,
         onExpandedChange = {
             expanded = !expanded
-            Log.e("FieldSelectInput", "Expanded: $expanded")
         }
     ) {
         TextField(
@@ -142,7 +137,6 @@ fun FieldSelectInput(
             onDismissRequest = { expanded = false },
         ) {
             options.forEach { option ->
-                Log.e("FieldSelectInput", "Option: $option")
                 DropdownMenuItem(
                     text = { Text(option.label) },
                     onClick = {

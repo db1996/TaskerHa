@@ -45,7 +45,6 @@ class GetStateConfigActivity :
             TaskerHaTheme {
                 HaGetStateScreen(viewModel) { entityId ->
                     this.entityId = entityId
-
                     helper.finishForTasker()
                 }
             }
@@ -54,7 +53,7 @@ class GetStateConfigActivity :
 
     override fun assignFromInput(input: TaskerInput<HaGetStateInput>) {
         entityId = input.regular.entityId
-        Log.e("GetStateConfigActivity", "entityId: $entityId")
+        Log.d("GetStateConfigActivity", "Restoring data, entityId: $entityId")
         viewModel.restoreForm(entityId)
     }
 
@@ -63,7 +62,6 @@ class GetStateConfigActivity :
             val haInput = HaGetStateInput().apply {
                 entityId = this@GetStateConfigActivity.entityId
             }
-            Log.e("GetStateConfigActivity", "inputForTasker: ${haInput.entityId}")
             return TaskerInput(haInput)
         }
 }

@@ -39,7 +39,7 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
                     )
                 }
 
-                Log.e("HaGetStateRunner", "Pinged, ${params.entityId}")
+                Log.d("HaGetStateRunner", "Pinged, getting state ${params.entityId}..")
                 val ok = client.getState(params.entityId)
                 if (!ok) {
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
@@ -66,7 +66,7 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
                     attrsMap
                 )
 
-                Log.e("HaGetStateRunner", "State: $state, Attributes: $attrsJson")
+                Log.d("HaGetStateRunner", "Result, State: $state, Attributes: $attrsJson")
 
                 TaskerPluginResultSucess(
                     HaGetStateOutput(

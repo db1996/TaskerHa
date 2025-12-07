@@ -61,7 +61,7 @@ fun HaGetStateScreen(
                     }
                     FilledIconButton(
                         onClick = {
-                            Log.e("PluginConfigScreen", "Saving action with data: ${form.entityId}")
+                            Log.d("HaGetStateScreen", "Saving action with data: ${form.entityId}")
                             val built = viewModel.buildForm()
                             onSave(built.entityId)
                         }

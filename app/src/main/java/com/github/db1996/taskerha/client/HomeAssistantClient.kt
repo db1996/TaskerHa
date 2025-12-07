@@ -183,7 +183,7 @@ class HomeAssistantClient(
             if (entityId.isNotEmpty()) payload["entity_id"] = entityId
             data?.let { payload.putAll(it) }
 
-            Log.e("HA client", "Payload: $payload")
+            Log.d("HA client", "Payload: $payload")
 
             val body = json.encodeToString(
                 MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
@@ -227,10 +227,6 @@ class HomeAssistantClient(
 
         haService.fields?.forEach { (id, fieldData) ->
             if (id != "advanced_fields") convertField(fieldData, id)?.let { actualService.fields += it }
-        }
-
-        if(actualService.id == "tree_patch" && actualService.domain == "runelite"){
-            Log.e("HA", "Found tree_patch service, $haService")
         }
 
         return actualService
@@ -284,9 +280,6 @@ class HomeAssistantClient(
                                     )
                                 }
                             }.toMutableList()
-                            if(fieldData.name == "Tree type" && fieldData.id == "crop_type"){
-                                Log.e("HA", "Found crop_type field, ${fieldData.options}")
-                            }
 
                             if(fieldData.options?.isEmpty() ?: true){
                                 fieldData.type = HaServiceFieldType.TEXT

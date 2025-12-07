@@ -50,12 +50,6 @@ class HaCallServiceViewModel(
                 }
                 services = result
                 Log.d("HA", "Loaded services: ${services.size}")
-
-                services.forEach { service ->
-                    if(service.id == "select_option" && service.domain == "input_select"){
-                        Log.e("HA", "Found select_option service, $service")
-                    }
-                }
                 pendingRestore?.let {
                     restoreForm(it.domain, it.service, it.entityId, it.data)
                     pendingRestore = null
@@ -99,8 +93,8 @@ class HaCallServiceViewModel(
                 form.dataContainer[field.id]?.toggle?.value = true
             }
         }
-        Log.e("HA", "Picked service: ${pservice.id}, fields: ${pservice.fields.size}, form: ${form.domain}, form: ${form.service}")
-        Log.e("HA", "Form data: ${form.dataContainer}")
+        Log.d("HA", "Picked service: ${pservice.id}, fields: ${pservice.fields.size}, form: ${form.domain}, form: ${form.service}")
+        Log.d("HA", "Form data: ${form.dataContainer}")
 
     }
 
@@ -181,7 +175,7 @@ class HaCallServiceViewModel(
             return
         }
 
-        Log.e("HA", "Restoring form: $domain, $service, $entity, $dataMap")
+        Log.d("HA", "Restoring form: $domain, $service, $entity, $dataMap")
         // Services loaded: perform the restoration
         selectedService = pservice
 

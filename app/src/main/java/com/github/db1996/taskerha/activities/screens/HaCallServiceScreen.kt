@@ -60,7 +60,6 @@ fun HaCallServiceScreen(
                     }
                     FilledIconButton(
                         onClick = {
-                            Log.e("PluginConfigScreen", "Saving action with data: ${form.domain}, ${form.service}, ${form.entityId}, ${form.dataContainer}")
                             val built = viewModel.buildForm()
                             onSave(built.domain, built.service, built.entityId, built.data)
                         }

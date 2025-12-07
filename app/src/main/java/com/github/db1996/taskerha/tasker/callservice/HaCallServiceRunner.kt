@@ -63,7 +63,7 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                         client.error
                     )
                 }
-                Log.e("HA Runner", "Result: ${client.result}")
+                Log.d("HaCallServiceRunner", "Result: ${client.result}")
                 result = client.result
             } catch (e: Exception) {
                 return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
