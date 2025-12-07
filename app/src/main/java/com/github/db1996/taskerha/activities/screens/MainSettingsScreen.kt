@@ -9,7 +9,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerState
+import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateTestEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -125,7 +125,7 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
         Button(
                 onClick = {
                     // Manually fire the Tasker event
-                    context.triggerOnTriggerState()
+                    context.triggerOnTriggerStateTestEvent("{\"id\":2,\"type\":\"event\",\"event\":{\"variables\":{\"trigger\":{\"id\":\"0\",\"idx\":\"0\",\"platform\":\"state\",\"entity_id\":\"light.pc_kamer_2\",\"from_state\":{\"entity_id\":\"light.pc_kamer_2\",\"state\":\"on\",\"attributes\":{\"device_class\":\"motion\",\"friendly_name\":\"motion occupancy\"},\"last_changed\":\"2022-01-09T10:30:37.585143+00:00\",\"last_updated\":\"2022-01-09T10:33:04.388104+00:00\",\"context\":{\"id\":\"90e30ad8e6d0c218840478d3c21dd754\",\"parent_id\":null,\"user_id\":null}},\"to_state\":{\"entity_id\":\"light.pc_kamer_2\",\"state\":\"off\",\"attributes\":{\"device_class\":\"motion\",\"friendly_name\":\"motion occupancy\"},\"last_changed\":\"2022-01-09T10:33:04.391956+00:00\",\"last_updated\":\"2022-01-09T10:33:04.391956+00:00\",\"context\":{\"id\":\"9b263f9e4e899819a0515a97f6ddfb47\",\"parent_id\":null,\"user_id\":null}},\"for\":null,\"attribute\":null,\"description\":\"state of binary_sensor.motion_occupancy\"}},\"context\":{\"id\":\"9b263f9e4e899819a0515a97f6ddfb47\",\"parent_id\":null,\"user_id\":null}}}")
                 }
                 ) {
             Text("Trigger OnTriggerState Tasker Event")

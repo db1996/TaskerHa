@@ -1,6 +1,5 @@
 package com.github.db1996.taskerha.activities.composables
 
-import android.util.Log
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem

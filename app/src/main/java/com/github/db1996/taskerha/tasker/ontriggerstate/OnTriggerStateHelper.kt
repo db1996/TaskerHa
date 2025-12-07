@@ -1,41 +1,25 @@
 package com.github.db1996.taskerha.tasker.ontriggerstate
 
-import android.app.Activity
 import android.content.Context
-import android.os.Bundle
+import android.util.Log
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
-import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelperEventNoOutputOrInputOrUpdate
-import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigNoInput
+import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
 import com.joaomgcd.taskerpluginlibrary.extensions.requestQuery
-import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 
 class OnTriggerStateHelper(
-    config: TaskerPluginConfig<Unit>
-) : TaskerPluginConfigHelperEventNoOutputOrInputOrUpdate(config) {
+    config: TaskerPluginConfig<OnTriggerStateInput>
+) : TaskerPluginConfigHelper<OnTriggerStateInput, OnTriggerStateUpdate, OnTriggerStateRunner>(config) {
 
-    override fun addToStringBlurb(
-        input: TaskerInput<Unit>,
-        blurbBuilder: StringBuilder
-    ) {
-        blurbBuilder.append("Home Assistant OnTriggerState (no filters yet)")
-    }
+    override val runnerClass = OnTriggerStateRunner::class.java
+    override val inputClass = OnTriggerStateInput::class.java
+    override val outputClass = OnTriggerStateUpdate::class.java
 }
-
-class ActivityConfigOnTriggerState :
-    Activity(),
-    TaskerPluginConfigNoInput {
-
-    override val context: Context
-        get() = applicationContext
-
-    private val helper by lazy { OnTriggerStateHelper(this) }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        helper.finishForTasker()
-    }
-}
-
-fun Context.triggerOnTriggerState() {
-    ActivityConfigOnTriggerState::class.java.requestQuery(this)
+fun Context.triggerOnTriggerStateTestEvent(rawJson: String) {
+    Log.e("OnTriggerState", "Sending test event to Tasker")
+    ActivityConfigOnTriggerState::class.java.requestQuery(
+        this,
+        OnTriggerStateUpdate(
+            rawJson = rawJson
+        )
+    )
 }
