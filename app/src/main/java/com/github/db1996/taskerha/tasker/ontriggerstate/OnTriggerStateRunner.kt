@@ -2,16 +2,13 @@ package com.github.db1996.taskerha.tasker.ontriggerstate
 
 import android.content.Context
 import android.util.Log
+import com.github.db1996.taskerha.service.data.HaWsEnvelope
 import com.joaomgcd.taskerpluginlibrary.condition.TaskerPluginRunnerConditionEvent
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionSatisfied
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionUnsatisfied
-import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class OnTriggerStateRunner :
     TaskerPluginRunnerConditionEvent<
@@ -19,6 +16,7 @@ class OnTriggerStateRunner :
             OnTriggerStateUpdate,
             OnTriggerStateUpdate
             >() {
+    private val json = Json { ignoreUnknownKeys = true }
 
     override fun getSatisfiedCondition(
         context: Context,
@@ -29,64 +27,39 @@ class OnTriggerStateRunner :
             return TaskerPluginResultConditionUnsatisfied()
         }
 
-
         val config = input.regular
-        Log.d("OnTriggerStateRunner", "config: entity=${config.entityId}, from=${config.fromState}, to=${config.toState}")
+        Log.d("HaWebSocketService", "config: entity=${config.entityId}, from=${config.fromState}, to=${config.toState}")
 
         val raw = update.rawJson!!
-        val jsonElement = try {
-            Json.parseToJsonElement(raw)
+        val envelope = try {
+            json.decodeFromString<HaWsEnvelope>(raw)
         } catch (e: Exception) {
-            Log.e("OnTriggerStateRunner", "JSON parse failed: ${e.message}")
+            Log.e("HaWebSocketService", "Invalid WS JSON: ${e.message}")
             return TaskerPluginResultConditionUnsatisfied()
         }
 
-        val root = jsonElement.jsonObject
-        val trigger = root["event"]
-            ?.jsonObject
-            ?.get("variables")
-            ?.jsonObject
-            ?.get("trigger")
-            ?.jsonObject ?: return TaskerPluginResultConditionUnsatisfied()
-
-        val entityId = trigger["entity_id"]?.jsonPrimitive?.content ?: ""
-        val fromStateObj = trigger["from_state"]?.jsonObject
-        val toStateObj = trigger["to_state"]?.jsonObject
-
-        val fromState = fromStateObj?.get("state")?.jsonPrimitive?.content
-        val toState = toStateObj?.get("state")?.jsonPrimitive?.content
-
-        val attributesMap: Map<String, String> = toStateObj
-            ?.get("attributes")
-            ?.jsonObject
-            ?.mapValues { (_, v) -> v.toString().trim('"') }
-            ?: emptyMap()
-
-        val attrsJson = Json.encodeToString(
-            MapSerializer(String.serializer(), String.serializer()),
-            attributesMap
-        )
-
-        update.entityId = entityId
-        update.fromState = fromState
-        update.toState = toState
-        update.state = toState
+        update.entityId = envelope.event?.data?.entity_id
+        update.fromState = envelope.event?.data?.old_state?.state
+        update.toState = envelope.event?.data?.new_state?.state
+        val attrsJson = envelope.event?.data?.new_state?.attributes?.toString()
+        update.state = envelope.event?.data?.new_state?.state
         update.attributesJson = attrsJson
+
 
         fun matches(configVal: String, eventVal: String?): Boolean {
             if (configVal.isBlank()) return true
             if (eventVal == null) return false
             return configVal == eventVal
         }
+        Log.d("HaWebSocketService", "update: entity=${update.entityId}, from=${update.fromState}, to=${update.toState}")
 
-        Log.d("OnTriggerStateRunner", "update: entity=${update.entityId}, from=${update.fromState}, to=${update.toState}")
-        if (!matches(config.entityId.trim(), entityId)) {
+        if (!matches(config.entityId.trim(), update.entityId)) {
             return TaskerPluginResultConditionUnsatisfied()
         }
-        if (!matches(config.fromState.trim(), fromState)) {
+        if (!matches(config.fromState.trim(), update.fromState)) {
             return TaskerPluginResultConditionUnsatisfied()
         }
-        if (!matches(config.toState.trim(), toState)) {
+        if (!matches(config.toState.trim(), update.toState)) {
             return TaskerPluginResultConditionUnsatisfied()
         }
 

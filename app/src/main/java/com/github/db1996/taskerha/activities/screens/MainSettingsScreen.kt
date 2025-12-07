@@ -1,5 +1,9 @@
 package com.github.db1996.taskerha.activities.screens
 
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.PowerManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,11 +13,14 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateTestEvent
+import com.github.db1996.taskerha.service.HaWebSocketService
+import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.provider.Settings
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,6 +30,7 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
 
     var url by remember { mutableStateOf(HaSettings.loadUrl(context)) }
     var token by remember { mutableStateOf(HaSettings.loadToken(context)) }
+    var wsEnabled by remember { mutableStateOf(HaSettings.loadWebSocketEnabled(context)) }
 
     var status by remember { mutableStateOf<Status>(Status.Idle) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -122,17 +130,47 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
         }
 
         StatusRow(status, error)
-        Button(
-                onClick = {
-                    // Manually fire the Tasker event
-                    context.triggerOnTriggerStateTestEvent("{\"id\":2,\"type\":\"event\",\"event\":{\"variables\":{\"trigger\":{\"id\":\"0\",\"idx\":\"0\",\"platform\":\"state\",\"entity_id\":\"light.pc_kamer_2\",\"from_state\":{\"entity_id\":\"light.pc_kamer_2\",\"state\":\"on\",\"attributes\":{\"device_class\":\"motion\",\"friendly_name\":\"motion occupancy\"},\"last_changed\":\"2022-01-09T10:30:37.585143+00:00\",\"last_updated\":\"2022-01-09T10:33:04.388104+00:00\",\"context\":{\"id\":\"90e30ad8e6d0c218840478d3c21dd754\",\"parent_id\":null,\"user_id\":null}},\"to_state\":{\"entity_id\":\"light.pc_kamer_2\",\"state\":\"off\",\"attributes\":{\"device_class\":\"motion\",\"friendly_name\":\"motion occupancy\"},\"last_changed\":\"2022-01-09T10:33:04.391956+00:00\",\"last_updated\":\"2022-01-09T10:33:04.391956+00:00\",\"context\":{\"id\":\"9b263f9e4e899819a0515a97f6ddfb47\",\"parent_id\":null,\"user_id\":null}},\"for\":null,\"attribute\":null,\"description\":\"state of binary_sensor.motion_occupancy\"}},\"context\":{\"id\":\"9b263f9e4e899819a0515a97f6ddfb47\",\"parent_id\":null,\"user_id\":null}}}")
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("Enable background HA triggers")
+            Switch(
+                checked = wsEnabled,
+                onCheckedChange = { enabled ->
+                    wsEnabled = enabled
+                    HaSettings.saveWebSocketEnabled(context, enabled)
+
+                    if (enabled) {
+                        requestIgnoreBatteryOptimizations(context)
+                        HaWebSocketService.start(context)
+                    } else {
+                        HaWebSocketService.stop(context)
+                    }
                 }
-                ) {
-            Text("Trigger OnTriggerState Tasker Event")
+            )
+        }
+        Text("This will enable a websocket server, only enable this if you intend to use profile events in tasker. This will listen to all state change triggers")
+        Text("It will also request for battery optimization exclusion. Otherwise this could stop working unexpectedly")
+        Text("Events will never be triggered if this is turned off. Regardless of profile activation in tasker")
+    }
+
+}
+fun requestIgnoreBatteryOptimizations(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        val pkg = context.packageName
+        if (!pm.isIgnoringBatteryOptimizations(pkg)) {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$pkg")
+            }
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
     }
 }
-
 
 @Composable
 private fun StatusRow(status: Status, error: String? = null) {
