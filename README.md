@@ -1,4 +1,4 @@
-# <img src="docs/logo.png" alt="Logo" width="50"/> TaskerHA
+# <img src="docs/logo.png" alt="Logo" width="50"/>TaskerHA
 
 A Tasker plugin to fully integrate HomeAssistant into your workflow!
 
@@ -12,8 +12,9 @@ TaskerHA lets you:
 
 
 Table of contents:
-- [ TaskerHA](#taskerha)
+- [TaskerHA](#taskerha)
   - [Requirements](#requirements)
+  - [Quick start](#quick-start)
   - [Usage](#usage)
     - [Setup](#setup)
     - [Call service action](#call-service-action)
@@ -70,24 +71,33 @@ Extra data where you usually see dropdowns in the Homeassistant UI will also hav
 
 You can use tasker variables in any of the text fields and they will be replaced automatically. This includes all optional data.
 
+**Example**
+
+Turn on a light from Tasker:
+
+- Action: Plugin -> TaskerHA -> HA Call service
+- Service: `light.turn_on`
+- Entity: `light.living_room`
+- Optional data: set `brightness: 200`
+
 #### Response in tasker
 
 The following variables are available from within tasker after the action
 
-| Variable | Function          |
-| -------- | ----------------- |
-| %ha_data | Complete API response (JSON), this will **usually** contain the new updated state of a called entity. But it's inconsistent from HA  |
+| Variable | Function                                                                                                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_data | Complete API response (JSON), this will **usually** contain the new updated state of a called entity. But it's inconsistent from HA                                                                        |
 | %err     | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
-| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.  |
+| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
 
 #### Error codes
 
-| Error code    | Description |
-| ------------- | ----------- |
-| 1             | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
-| 2             | Service call failed. This means that it can connect correctly with Homeassistant but the service call itself failed. %errmsg will contain more details |
-| 3            | Unknown error occured. %errmsg will contain more details (java error)|
-| 4             | Invalid JSON Data, this means the app failed to map your data to a valid JSON format. This is about the optional options for service calls |
+| Error code | Description                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1          | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
+| 2          | Service call failed. This means that it can connect correctly with Homeassistant but the service call itself failed. %errmsg will contain more details                             |
+| 3          | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
+| 4          | Invalid JSON Data, this means the app failed to map your data to a valid JSON format. This is about the optional options for service calls                                         |
 
 
 ### Get State action
@@ -98,25 +108,35 @@ The following variables are available from within tasker after the action
 
 You can use tasker variables for the entity ID, make sure to use the "%" for any variable use.
 
+**Example**
+
+Check if the alarm is armed:
+
+- Action: Plugin -> TaskerHA -> HA Get state
+- Entity: `alarm_control_panel.home_alarm`
+- After the action, read `%ha_state` in Tasker.  
+  For example, run different actions based on `%ha_state ~ armed_away` or `disarmed`.
+
+
 #### Response in tasker
 
 The following variables are available from within tasker after the action
 
-| Variable  | Function          |
-| --------- | ----------------- |
-| %ha_state | Contains the current state of the choosen entity |
-| %ha_attrs | Contains in JSON any attributes on the entity. For example, for lights you will get the color, brightness etc. |
-| %ha_raw   | Raw JSON of the full API response from homeassistant.|
+| Variable  | Function                                                                                                                                                                                                   |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_state | Contains the current state of the choosen entity                                                                                                                                                           |
+| %ha_attrs | Contains in JSON any attributes on the entity. For example, for lights you will get the color, brightness etc.                                                                                             |
+| %ha_raw   | Raw JSON of the full API response from homeassistant.                                                                                                                                                      |
 | %err      | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
-| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.  |
+| %errmsg   | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
 
 #### Error codes
 
-| Error code    | Description |
-| ------------- | ----------- |
-| 1             | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
-| 2             | Get entity state call failed. This means that it can connect correctly with Homeassistant but the entity state call itself failed. %errmsg will contain more details |
-| 3            | Unknown error occured. %errmsg will contain more details (java error)|
+| Error code | Description                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1          | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
+| 2          | Get entity state call failed. This means that it can connect correctly with Homeassistant but the entity state call itself failed. %errmsg will contain more details               |
+| 3          | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
 
 
 ### Trigger state change profile
@@ -131,22 +151,33 @@ The websocket option in the main app has to be turned on for this. Oterwise it w
 
 Any state change to the choosen element will fire the profile
 
+**Example**
+
+Run a Tasker task when the door opens:
+
+- Profile: Plugin -> TaskerHA -> HA On trigger state
+- Entity: `binary_sensor.front_door`
+- From: `off`
+- To: `on`
+
+Now any time the door opens, this profile will fire and you can run any Tasker task.
+
 #### Response in tasker
 
 The following variables are available from within tasker after the action
 
-| Variable  | Function          |
-| --------- | ----------------- |
-| %ha_to    | Contains the current state of the choosen entity. Example `on` |
-| %ha_from    | Contains the old state of the choosen entity. Example `off` |
-| %ha_attrs | Contains in JSON any attributes on the entity for the new state. For example, for lights you will get the color, brightness etc. |
-| %ha_entity    | Contains the entity_id of the choosen entity |
-| %ha_raw   | Raw JSON of the full entity state change response from homeassistant. |
-| %err      | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
-| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.  |
+| Variable   | Function                                                                                                                                                                                                   |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_to     | Contains the current state of the choosen entity. Example `on`                                                                                                                                             |
+| %ha_from   | Contains the old state of the choosen entity. Example `off`                                                                                                                                                |
+| %ha_attrs  | Contains in JSON any attributes on the entity for the new state. For example, for lights you will get the color, brightness etc.                                                                           |
+| %ha_entity | Contains the entity_id of the choosen entity                                                                                                                                                               |
+| %ha_raw    | Raw JSON of the full entity state change response from homeassistant.                                                                                                                                      |
+| %err       | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
+| %errmsg    | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
 
 #### Error codes
 
-| Error code    | Description |
-| ------------- | ----------- |
-| 3             | Unknown error occured. %errmsg will contain more details (java error)|
+| Error code | Description                                                           |
+| ---------- | --------------------------------------------------------------------- |
+| 3          | Unknown error occured. %errmsg will contain more details (java error) |
