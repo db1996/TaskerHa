@@ -26,6 +26,7 @@ class OnTriggerStateViewModel(
 
     var currentDomainSearch: String by mutableStateOf("")
     var pendingRestore: HaCallServiceBuiltForm? = null
+    var clientError: String by mutableStateOf("")
 
     fun loadEntities(force: Boolean = false) {
         viewModelScope.launch {
@@ -35,6 +36,10 @@ class OnTriggerStateViewModel(
                 }
                 val result = withContext(Dispatchers.IO) {
                     client.getEntities()
+                }
+                if(client.error != ""){
+                    clientError = client.error
+                    return@launch
                 }
                 entities = result
                 Log.d("HA", "Loaded entities: ${entities.size}")

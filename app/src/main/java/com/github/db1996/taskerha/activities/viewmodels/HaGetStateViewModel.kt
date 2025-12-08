@@ -25,6 +25,7 @@ class HaGetStateViewModel(
 
     var currentDomainSearch: String by mutableStateOf("")
     var pendingRestore: HaCallServiceBuiltForm? = null
+    var clientError: String by mutableStateOf("")
 
     fun loadEntities(force: Boolean = false) {
         viewModelScope.launch {
@@ -34,6 +35,10 @@ class HaGetStateViewModel(
                 }
                 val result = withContext(Dispatchers.IO) {
                     client.getEntities()
+                }
+                if(client.error != ""){
+                    clientError = client.error
+                    return@launch
                 }
                 entities = result
                 Log.d("HA", "Loaded entities: ${entities.size}")
@@ -62,6 +67,11 @@ class HaGetStateViewModel(
             try {
                 val success = withContext(Dispatchers.IO) {
                     client.getState(entityId)
+
+                }
+                if(client.error != ""){
+                    clientError = client.error
+                    return@launch
                 }
                 Log.d("HA", "Get state ${if (success) "succeeded" else "failed"}, ${client.result}")
             } catch (e: Exception) {

@@ -33,6 +33,7 @@ class HaCallServiceViewModel(
     var currentServiceSearch: String by mutableStateOf("")
     var pendingRestore: HaCallServiceBuiltForm? = null
 
+    var clientError: String by mutableStateOf("")
 
     fun loadServices(force: Boolean = false) {
         viewModelScope.launch {
@@ -41,8 +42,17 @@ class HaCallServiceViewModel(
                     client.ping()
                 }
 
+                if(!resultPing){
+                    clientError = client.error
+                    return@launch
+                }
+
                 val result = withContext(Dispatchers.IO) {
                     client.getServicesFront(force)
+                }
+                if(client.error != ""){
+                    clientError = client.error
+                    return@launch
                 }
 
                 if(result.isEmpty()){
@@ -68,6 +78,10 @@ class HaCallServiceViewModel(
                 }
                 val result = withContext(Dispatchers.IO) {
                     client.getEntities()
+                }
+                if(client.error != ""){
+                    clientError = client.error
+                    return@launch
                 }
                 entities = result
                 Log.d("HA", "Loaded entities: ${entities.size}")
@@ -149,12 +163,10 @@ class HaCallServiceViewModel(
         val service = form.service
         val entityId = form.entityId
 
-        // Only selected fields
         val data = form.dataContainer
             .filter { it.value.toggle.value }
             .mapValues { it.value.value.value }
 
-        // Build consistent blurb
         var msg = ""
 
         return HaCallServiceBuiltForm(
@@ -170,13 +182,11 @@ class HaCallServiceViewModel(
         val pservice = services.find { it.domain == domain && it.id == service }
 
         if (pservice == null) {
-            // Not loaded yet → store for later
             pendingRestore = HaCallServiceBuiltForm(domain, service, entity, dataMap, "")
             return
         }
 
         Log.d("HA", "Restoring form: $domain, $service, $entity, $dataMap")
-        // Services loaded: perform the restoration
         selectedService = pservice
 
         form = HomeassistantForm().apply {

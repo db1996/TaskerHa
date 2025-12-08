@@ -75,6 +75,12 @@ fun HaCallServiceScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (viewModel.clientError != "") {
+                Text(viewModel.clientError, color = MaterialTheme.colorScheme.error)
+
+                Text("Please check your connection settings in the main app outside of tasker")
+            }
+
             Button(onClick = { viewModel.unsetPickedService() }) {
                 Text("Reset domain/service")
             }

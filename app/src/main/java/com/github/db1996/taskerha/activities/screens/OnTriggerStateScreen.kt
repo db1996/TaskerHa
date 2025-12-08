@@ -10,6 +10,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -64,6 +65,11 @@ fun OnTriggerStateScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (viewModel.clientError != "") {
+                Text(viewModel.clientError, color = MaterialTheme.colorScheme.error)
+
+                Text("Please check your connection settings in the main app outside of tasker")
+            }
             if(entitySearching)
                 TextField(
                     value = viewModel.currentDomainSearch,
