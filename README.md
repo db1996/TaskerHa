@@ -4,6 +4,13 @@ A Tasker plugin to fully integrate HomeAssistant into your workflow!
 
 You can respond to entity state changes, call any HA service, or retrieve an entity's state.
 
+TaskerHA lets you:
+
+- Call any Home Assistant service from a Tasker action
+- Read the state and attributes of any entity
+- Trigger Tasker profiles when an entity changes state over a websocket connection
+
+
 Table of contents:
 - [ TaskerHA](#taskerha)
   - [Requirements](#requirements)
@@ -25,6 +32,14 @@ Table of contents:
 - <a href="https://tasker.joaoapps.com/" target="_blank">Tasker</a>
 - <a href="https://www.home-assistant.io/" target="_blank">Home assistant</a>
 
+## Quick start
+
+1. Create a <a href="https://www.home-assistant.io/docs/authentication/" target="_blank">Create a Long-lived access token</a> in your Home Assistant user profile.
+2. Download and install the APK from the <a href="https://github.com/db1996/TaskerHa/releases/latest" target="_blank">GitHub releases page</a>.
+3. Open the TaskerHA app and configure your Home Assistant URL and token.
+4. In Tasker, add an "HA Call service" or "HA Get state" action.
+5. (Optional) Enable websockets in the app and create an "HA On trigger state" profile to react to entity changes.
+
 ## Usage
 
 ### Setup
@@ -33,7 +48,6 @@ Table of contents:
 2. Install the app. For now, the APK is available <a href="https://github.com/db1996/TaskerHa/releases/latest" target="_blank">here in releases</a>, but in the future it will be available on f-droid (hopefully)
 3. Open the app (outside of tasker) and fill in your Homeassistant server details. This works both over localhost and remote
    - Use the scheme and optionally the port in the url. Example: `http://192.168.1.xxx:8123` for a local instance. Or `https://ha.yourdomain.com`. For proxy servers you do **not** need to use a port.
-   - Do not fill in the protocol in the text field, this is automatically choosen based on the dropdown.
    - Do not use a trailing backslash in the host.
    - NOTE: Turning on the websocket will prompt you to turn off battery optimization. Without it the websocket connection might be killed by android and profiles will no longer fire.
    - Turning off websockets in TaskerHa also means any profiles active will never fire.
