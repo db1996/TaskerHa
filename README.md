@@ -32,7 +32,7 @@ Table of contents:
 1. <a href="https://www.home-assistant.io/docs/authentication/" target="_blank">Create a Long-lived access token</a> in your Homeassistant. And save it for later in the process.
 2. Install the app. For now, the APK is available <a href="https://github.com/db1996/TaskerHa/releases/latest" target="_blank">here in releases</a>, but in the future it will be available on f-droid (hopefully)
 3. Open the app (outside of tasker) and fill in your Homeassistant server details. This works both over localhost and remote
-   - Use the scheme and port in the url. Example: `http://192.168.1.xxx:8123` for a local instance. Or `https://ha.yourdomain.com`. For proxy servers you do **not** need to use a port.
+   - Use the scheme and optionally the port in the url. Example: `http://192.168.1.xxx:8123` for a local instance. Or `https://ha.yourdomain.com`. For proxy servers you do **not** need to use a port.
    - Do not fill in the protocol in the text field, this is automatically choosen based on the dropdown.
    - Do not use a trailing backslash in the host.
    - NOTE: Turning on the websocket will prompt you to turn off battery optimization. Without it the websocket connection might be killed by android and profiles will no longer fire.
