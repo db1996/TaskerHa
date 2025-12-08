@@ -1,11 +1,15 @@
 <resources>
     <string name="app_name">TaskerHa</string>
-    <string name="notification_channel_error_name">Plugin Errors</string>
-    <string name="notification_channel_error_description">Shows notifications for errors from the
-        TaskerHA plugin.
-    </string>
-    <string name="title_activity_main2">MainActivity2</string>
-    <string name="ha_output_data">%ha_data</string>
-    <string name="ha_output_data_label">HA Data JSON</string>
-    <string name="ha_output_data_html_label"><b>HA Data JSON</b></string>
+
+    <string name="ha_raw_label">Raw response (JSON)</string>
+
+    <string name="ha_call_service_data_label">Response JSON, this can be inconsistent with HA</string>
+
+    <string name="ha_get_state_state_label">Entity state</string>
+    <string name="ha_get_state_attrs_label">Attributes (JSON). For example: brightness: 100</string>
+
+    <string name="ha_on_trigger_entity_label">Entity ID</string>
+    <string name="ha_on_trigger_from_label">Old state</string>
+    <string name="ha_on_trigger_to_label">New state</string>
+    <string name="ha_on_trigger_attrs_label">New state attributes (JSON). For example: brightness: 100</string>
 </resources>

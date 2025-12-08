@@ -21,6 +21,10 @@ class HaCallServiceInput {
 
 @TaskerOutputObject
 class HaCallServiceOutput(
-    @get:TaskerOutputVariable("ha_data")
+
+    @get:TaskerOutputVariable(
+        name = "ha_data",
+        labelResIdName = "ha_call_service_data_label"
+    )
     val dataJson: String
 )

@@ -28,7 +28,6 @@ class OnTriggerStateRunner :
         }
 
         val config = input.regular
-        Log.d("HaWebSocketService", "config: entity=${config.entityId}, from=${config.fromState}, to=${config.toState}")
 
         val raw = update.rawJson!!
         val envelope = try {
@@ -42,7 +41,6 @@ class OnTriggerStateRunner :
         update.fromState = envelope.event?.data?.old_state?.state
         update.toState = envelope.event?.data?.new_state?.state
         val attrsJson = envelope.event?.data?.new_state?.attributes?.toString()
-        update.state = envelope.event?.data?.new_state?.state
         update.attributesJson = attrsJson
 
 
@@ -51,18 +49,20 @@ class OnTriggerStateRunner :
             if (eventVal == null) return false
             return configVal == eventVal
         }
+
+        if(update.entityId != null && config.entityId != ""){
+            if (!matches(config.entityId.trim(), update.entityId)) {
+                return TaskerPluginResultConditionUnsatisfied()
+            }
+            if (!matches(config.fromState.trim(), update.fromState)) {
+                return TaskerPluginResultConditionUnsatisfied()
+            }
+            if (!matches(config.toState.trim(), update.toState)) {
+                return TaskerPluginResultConditionUnsatisfied()
+            }
+        }
+
         Log.d("HaWebSocketService", "update: entity=${update.entityId}, from=${update.fromState}, to=${update.toState}")
-
-        if (!matches(config.entityId.trim(), update.entityId)) {
-            return TaskerPluginResultConditionUnsatisfied()
-        }
-        if (!matches(config.fromState.trim(), update.fromState)) {
-            return TaskerPluginResultConditionUnsatisfied()
-        }
-        if (!matches(config.toState.trim(), update.toState)) {
-            return TaskerPluginResultConditionUnsatisfied()
-        }
-
         return TaskerPluginResultConditionSatisfied(context, update)
     }
 }

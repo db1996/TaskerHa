@@ -10,26 +10,22 @@ import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 class OnTriggerStateUpdate @JvmOverloads constructor(
 
     @field:TaskerInputField("rawJson")
-    @get:TaskerOutputVariable("ha_raw")
+    @get:TaskerOutputVariable("ha_raw", labelResIdName = "ha_raw_label")
     var rawJson: String? = null,
 
     @field:TaskerInputField("entityId")
-    @get:TaskerOutputVariable("ha_entity")
+    @get:TaskerOutputVariable("ha_entity", labelResIdName = "ha_on_trigger_entity_label")
     var entityId: String? = null,
 
-    @field:TaskerInputField("state")
-    @get:TaskerOutputVariable("ha_state")
-    var state: String? = null,
-
     @field:TaskerInputField("fromState")
-    @get:TaskerOutputVariable("ha_from")
+    @get:TaskerOutputVariable("ha_from", labelResIdName = "ha_on_trigger_from_label")
     var fromState: String? = null,
 
     @field:TaskerInputField("toState")
-    @get:TaskerOutputVariable("ha_to")
+    @get:TaskerOutputVariable("ha_to", labelResIdName = "ha_on_trigger_to_label")
     var toState: String? = null,
 
     @field:TaskerInputField("attributesJson")
-    @get:TaskerOutputVariable("ha_attrs")
+    @get:TaskerOutputVariable("ha_attrs", labelResIdName = "ha_on_trigger_attrs_label")
     var attributesJson: String? = null
 )
