@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.github.db1996.taskerha.R
 import com.github.db1996.taskerha.datamodels.HaSettings
@@ -27,6 +29,7 @@ class HaWebSocketService : Service() {
         const val CHANNEL_ID = "ha_websocket_channel"
         const val NOTIFICATION_ID = 1001
 
+        @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
             val intent = Intent(context, HaWebSocketService::class.java)
             context.startForegroundService(intent)
@@ -75,7 +78,6 @@ class HaWebSocketService : Service() {
             return
         }
 
-        // Convert REST URL to WS URL (basic version, adapt to your setup)
         val wsUrl = url
             .replace("https://", "wss://")
             .replace("http://", "ws://")
@@ -86,11 +88,11 @@ class HaWebSocketService : Service() {
             .build()
 
         webSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
-            override fun onOpen(ws: WebSocket, response: okhttp3.Response) {
-                ws.send("{\"type\": \"auth\", \"access_token\": \"$token\"}")
+            override fun onOpen(webSocket: WebSocket, response: okhttp3.Response) {
+                webSocket.send("{\"type\": \"auth\", \"access_token\": \"$token\"}")
             }
 
-            override fun onMessage(ws: WebSocket, text: String) {
+            override fun onMessage(webSocket: WebSocket, text: String) {
                 Log.d("HaWebSocketService", "onMessage: $text")
 
                 val envelope = try {
@@ -101,7 +103,7 @@ class HaWebSocketService : Service() {
                 }
 
                 when (envelope.type) {
-                    "auth_ok" -> ws.send("""{"id":$TRIGGER_STATE_EVENT_ID,"type":"subscribe_events","event_type":"state_changed"}""")
+                    "auth_ok" -> webSocket.send("""{"id":$TRIGGER_STATE_EVENT_ID,"type":"subscribe_events","event_type":"state_changed"}""")
                     "auth_invalid" -> {
                         Log.e("HaWebSocketService", "Auth invalid")
                         stopSelf()
@@ -120,12 +122,12 @@ class HaWebSocketService : Service() {
                 }
             }
 
-            override fun onClosing(ws: WebSocket, code: Int, reason: String) {
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 Log.e("HaWebSocketService", "onClosing: $code $reason")
-                ws.close(code, reason)
+                webSocket.close(code, reason)
             }
 
-            override fun onFailure(ws: WebSocket, t: Throwable, response: okhttp3.Response?) {
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
                 Log.e("HaWebSocketService", "onFailure: ${t.message}")
                 stopSelf()
             }
