@@ -1,6 +1,6 @@
 # <img src="docs/logo.png" alt="Logo" width="50"/> TaskerHA
 
-A Taker plugin to fully integrate HomeAssistant into your workflow!
+A Tasker plugin to fully integrate HomeAssistant into your workflow!
 
 You can respond to entity state changes, call any HA service, or retrieve an entity's state.
 
