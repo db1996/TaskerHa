@@ -1,5 +1,7 @@
 package com.github.db1996.taskerha.activities.screens
 
+import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -20,8 +22,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.provider.Settings
-import android.net.Uri
+import androidx.annotation.RequiresApi
+import androidx.core.net.toUri
+import androidx.core.content.edit
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -> Unit) {
@@ -39,6 +44,7 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
     var saved by remember { mutableStateOf(false) }
     var unsavedChanges by remember { mutableStateOf(false) }
 
+    var showBatteryDialog by remember { mutableStateOf(!hasSeenBatteryDialog(context) && wsEnabled) }
     fun checkUnsavedChanges(){
         if(url != HaSettings.loadUrl(context) || token != HaSettings.loadToken(context)) {
             unsavedChanges = true
@@ -50,7 +56,6 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
     fun setSaved(){
         saved = true
         checkUnsavedChanges()
-        // set saved back to false after 1.2s
         scope.launch {
             delay(1200)
             saved = false
@@ -145,8 +150,11 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
                     HaSettings.saveWebSocketEnabled(context, enabled)
 
                     if (enabled) {
-                        requestIgnoreBatteryOptimizations(context)
-                        HaWebSocketService.start(context)
+                        if (!hasSeenBatteryDialog(context)) {
+                            showBatteryDialog = true
+                        }else{
+                            HaWebSocketService.start(context)
+                        }
                     } else {
                         HaWebSocketService.stop(context)
                     }
@@ -158,18 +166,61 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
         Text("Events will never be triggered if this is turned off. Regardless of profile activation in tasker")
     }
 
-}
-fun requestIgnoreBatteryOptimizations(context: Context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        val pkg = context.packageName
-        if (!pm.isIgnoringBatteryOptimizations(pkg)) {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.parse("package:$pkg")
+    if (showBatteryDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatteryDialog = false },
+            title = { Text("Allow background activity") },
+            text = {
+                Text(
+                    "To reliably receive Home Assistant triggers, Android must allow this app " +
+                            "to run in the background.\n\n" +
+                            "On the next screen, open Battery and set it to allow background activity " +
+                            "or Unrestricted (wording may differ per device)."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showBatteryDialog = false
+                        setBatteryDialogShown(context)
+                        openAppBatterySettings(context)
+                    }
+                ) { Text("Open settings") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showBatteryDialog = false
+                        wsEnabled = false
+                        HaSettings.saveWebSocketEnabled(context, false)
+                        HaWebSocketService.stop(context)
+                    }
+                ) { Text("Not now") }
             }
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
+        )
     }
+
+
+
+}
+private const val PREFS_NAME = "settings"
+private const val KEY_BATTERY_DIALOG_SHOWN = "battery_dialog_shown"
+
+fun hasSeenBatteryDialog(context: Context): Boolean {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    return prefs.getBoolean(KEY_BATTERY_DIALOG_SHOWN, false)
+}
+
+fun setBatteryDialogShown(context: Context, value: Boolean = true) {
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    prefs.edit { putBoolean(KEY_BATTERY_DIALOG_SHOWN, value) }
+}
+
+fun openAppBatterySettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = "package:${context.packageName}".toUri()
+    }
+    context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 @Composable
