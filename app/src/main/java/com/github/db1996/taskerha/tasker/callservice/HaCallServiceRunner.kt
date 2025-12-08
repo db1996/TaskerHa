@@ -45,7 +45,7 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                     ).mapValues { it.value as Any }
                 } catch (e: Exception) {
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
-                        2,
+                        4,
                         "Invalid JSON Data: ${e.message}"
                     )
                 }
@@ -59,7 +59,7 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
 
                 if (!ok) {
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
-                        3,
+                        2,
                         client.error
                     )
                 }
@@ -67,7 +67,7 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                 result = client.result
             } catch (e: Exception) {
                 return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
-                    4,
+                    3,
                     e.message ?: "Unknown crash"
                 )
             }
