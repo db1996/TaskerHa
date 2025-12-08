@@ -1,0 +1,3 @@
+Initial release
+
+See full documentation here: https://github.com/db1996/TaskerHa

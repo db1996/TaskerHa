@@ -1,0 +1,1 @@
+A Tasker plugin to fully integrate Home Assistant into your workflow

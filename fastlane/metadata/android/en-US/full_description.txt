@@ -1,0 +1,11 @@
+TaskerHA is a Tasker plugin that connects Tasker to Home Assistant.
+
+Features:
+• Respond to entity state changes
+• Call any Home Assistant service
+• Retrieve an entity's state
+• Full integration with Tasker variables
+
+Requires:
+• Tasker
+• Home Assistant instance with a long-lived access token
