@@ -12,4 +12,7 @@
     <string name="ha_on_trigger_from_label">Old state</string>
     <string name="ha_on_trigger_to_label">New state</string>
     <string name="ha_on_trigger_attrs_label">New state attributes (JSON). For example: brightness: 100</string>
+
+    <string name="on_ha_message_type_label">Type (optional), can be anything custom</string>
+    <string name="on_ha_message_message_label">Message (optional), can be anything custom</string>
 </resources>

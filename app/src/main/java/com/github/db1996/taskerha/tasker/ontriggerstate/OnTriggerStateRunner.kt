@@ -2,7 +2,7 @@ package com.github.db1996.taskerha.tasker.ontriggerstate
 
 import android.content.Context
 import android.util.Log
-import com.github.db1996.taskerha.service.data.HaWsEnvelope
+import com.github.db1996.taskerha.service.data.OnTriggerStateWsEnvelope
 import com.joaomgcd.taskerpluginlibrary.condition.TaskerPluginRunnerConditionEvent
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
@@ -31,9 +31,9 @@ class OnTriggerStateRunner :
 
         val raw = update.rawJson!!
         val envelope = try {
-            json.decodeFromString<HaWsEnvelope>(raw)
+            json.decodeFromString<OnTriggerStateWsEnvelope>(raw)
         } catch (e: Exception) {
-            Log.e("HaWebSocketService", "Invalid WS JSON: ${e.message}")
+            Log.e("HaWebSocketService", "Invalid WS JSON1: ${e.message}")
             return TaskerPluginResultConditionUnsatisfied()
         }
 
@@ -62,7 +62,7 @@ class OnTriggerStateRunner :
             }
         }
 
-        Log.d("HaWebSocketService", "update: entity=${update.entityId}, from=${update.fromState}, to=${update.toState}")
+//        Log.d("HaWebSocketService", "update: entity=${update.entityId}, from=${update.fromState}, to=${update.toState}")
         return TaskerPluginResultConditionSatisfied(context, update)
     }
 }

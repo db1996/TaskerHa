@@ -3,27 +3,27 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
-data class HaWsEnvelope(
+data class OnTriggerStateWsEnvelope(
     val type: String,
     val id: Int? = null,
-    val event: HaWsEvent? = null
+    val event: OnTriggerStateWsEvent? = null
 )
 
 @Serializable
-data class HaWsEvent(
+data class OnTriggerStateWsEvent(
     val event_type: String,
-    val data: HaWsEventData? = null
+    val data: OnTriggerStateWsData? = null
 )
 
 @Serializable
-data class HaWsEventData(
+data class OnTriggerStateWsData(
     val entity_id: String,
-    val old_state: HaWsState? = null,
-    val new_state: HaWsState? = null
+    val old_state: OnTriggerStateWsEntity? = null,
+    val new_state: OnTriggerStateWsEntity? = null
 )
 
 @Serializable
-data class HaWsState(
+data class OnTriggerStateWsEntity(
     val entity_id: String,
     val state: String,
     val last_changed: String,

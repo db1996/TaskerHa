@@ -11,7 +11,9 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.github.db1996.taskerha.R
 import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.service.data.HaWsEnvelope
+import com.github.db1996.taskerha.service.data.HaMessageWsEnvelope
+import com.github.db1996.taskerha.service.data.OnTriggerStateWsEnvelope
+import com.github.db1996.taskerha.tasker.onHaMessage.triggerOnHaMessageHelper
 import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
@@ -129,39 +131,59 @@ class HaWebSocketService : Service() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 Log.d("HaWebSocketService", "onMessage: $text")
 
-                val envelope = try {
-                    json.decodeFromString<HaWsEnvelope>(text)
-                } catch (e: Exception) {
-                    Log.e("HaWebSocketService", "Invalid WS JSON: ${e.message}")
-                    return
-                }
+                // OnTriggerState
+                try {
+                    val envelope = json.decodeFromString<OnTriggerStateWsEnvelope>(text)
 
-                when (envelope.type) {
-                    "auth_ok" -> {
-                        Log.d("HaWebSocketService", "Auth OK, subscribing to state_changed")
-                        updateNotification("Connected to Home Assistant")
-                        reconnectAttempts = 0
-                        reconnectJob?.cancel()
-                        webSocket.send(
-                            """{"id":$TRIGGER_STATE_EVENT_ID,"type":"subscribe_events","event_type":"state_changed"}"""
-                        )
-                    }
-                    "auth_invalid" -> {
-                        Log.e("HaWebSocketService", "Auth invalid, stopping service")
-                        stopSelf()
-                    }
-                    "event" -> {
-                        val ev = envelope.event ?: return
-                        if (ev.event_type == "state_changed") {
-                            val data = ev.data ?: return
-                            Log.d(
-                                "HaWebSocketService",
-                                "state_changed for ${data.entity_id}: ${data.old_state?.state} -> ${data.new_state?.state}"
+                    when (envelope.type) {
+                        "auth_ok" -> {
+                            Log.d("HaWebSocketService", "Auth OK, subscribing to state_changed")
+                            updateNotification("Connected to Home Assistant")
+                            reconnectAttempts = 0
+                            reconnectJob?.cancel()
+                            webSocket.send(
+                                """{"id":$TRIGGER_STATE_EVENT_ID,"type":"subscribe_events","event_type":"state_changed"}"""
                             )
-                            this@HaWebSocketService.triggerOnTriggerStateEvent(text)
+
+                            webSocket.send(
+                                """{"id":2,"type":"subscribe_events","event_type":"ha_message"}"""
+                            )
+                        }
+                        "auth_invalid" -> {
+                            Log.e("HaWebSocketService", "Auth invalid, stopping service")
+                            stopSelf()
+                        }
+                        "event" -> {
+                            val ev = envelope.event ?: return
+                            if (ev.event_type == "state_changed") {
+                                this@HaWebSocketService.triggerOnTriggerStateEvent(text)
+                            }
                         }
                     }
+                } catch (e: Exception) {
+
+                    try {
+                        val envelope = json.decodeFromString<HaMessageWsEnvelope>(text)
+
+                        when (envelope.type) {
+                            "event" -> {
+                                val ev = envelope.event ?: return
+
+                                if(ev.event_type == "ha_message"){
+                                    Log.d("HaWebSocketService", "HaMessage: ${ev.data?.type}, ${ev.data?.message}")
+
+                                    this@HaWebSocketService.triggerOnHaMessageHelper(ev.data?.type,
+                                        ev.data?.message
+                                    )
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.d("HaWebSocketService", "Not HaMessage: ${e.message}")
+                        return
+                    }
                 }
+
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
