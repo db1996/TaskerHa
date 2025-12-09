@@ -1,9 +1,11 @@
 package com.github.db1996.taskerha.activities.screens
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
 import androidx.compose.foundation.layout.*
@@ -22,9 +24,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.content.edit
+import com.github.db1996.taskerha.util.hasNotificationPermission
 
 @RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +67,29 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
             saved = false
         }
     }
+
+    fun enableWebSocket() {
+        wsEnabled = true
+        HaSettings.saveWebSocketEnabled(context, true)
+
+        if (!hasSeenBatteryDialog(context)) {
+            showBatteryDialog = true
+        } else {
+            HaWebSocketService.start(context)
+        }
+    }
+
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { granted ->
+            if (granted) {
+                enableWebSocket()
+            } else {
+                wsEnabled = false
+                HaSettings.saveWebSocketEnabled(context, false)
+            }
+        }
 
     LaunchedEffect(Unit) {
         setTopBar {
@@ -146,24 +175,30 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
             Switch(
                 checked = wsEnabled,
                 onCheckedChange = { enabled ->
-                    wsEnabled = enabled
-                    HaSettings.saveWebSocketEnabled(context, enabled)
-
                     if (enabled) {
-                        if (!hasSeenBatteryDialog(context)) {
-                            showBatteryDialog = true
-                        }else{
-                            HaWebSocketService.start(context)
+                        if (hasNotificationPermission(context)) {
+                            enableWebSocket()
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            )
+                        } else {
+                            // Pre-Android 13, just enable
+                            enableWebSocket()
                         }
                     } else {
+                        wsEnabled = false
+                        HaSettings.saveWebSocketEnabled(context, false)
                         HaWebSocketService.stop(context)
                     }
                 }
             )
         }
+
         Text("This will enable a websocket server, only enable this if you intend to use profile events in tasker. This will listen to all state change triggers")
         Text("It will also request for battery optimization exclusion. Otherwise this could stop working unexpectedly")
         Text("Events will never be triggered if this is turned off. Regardless of profile activation in tasker")
+
     }
 
     if (showBatteryDialog) {
