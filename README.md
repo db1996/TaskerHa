@@ -14,6 +14,7 @@ TaskerHA lets you:
 Table of contents:
 - [TaskerHA](#taskerha)
   - [Requirements](#requirements)
+  - [Download](#download)
   - [Quick start](#quick-start)
   - [Usage](#usage)
     - [Setup](#setup)
@@ -33,10 +34,29 @@ Table of contents:
 - <a href="https://tasker.joaoapps.com/" target="_blank">Tasker</a>
 - <a href="https://www.home-assistant.io/" target="_blank">Home assistant</a>
 
+## Download
+
+<a  href="https://github.com/db1996/TaskerHa/releases/latest">
+<img width="150" height="auto" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png"
+alt="Download from GitHub releases" /></a>
+<!-- <a  href="https://f-droid.org/packages/com.github.db1996.taskerha/"> -->
+<!-- <img width="150" height="auto" src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" -->
+<!-- alt="Download from fdroid" /></a> -->
+
+
+![GitHub All Releases](https://img.shields.io/github/downloads/db1996/TaskerHa/total)
+<!-- ![F-Droid Version](https://img.shields.io/f-droid/v/com.github.db1996.taskerha) -->
+
+F-droid release coming soon
+
+<!-- NOTE: You can not install the f-droid release next to the github release. You will have to uninstall and reinstall the version you want. Tasks/profiles should keep working but you'll have to configure your server again. -->
+
+
+
 ## Quick start
 
 1. Create a <a href="https://www.home-assistant.io/docs/authentication/" target="_blank">Create a Long-lived access token</a> in your Home Assistant user profile.
-2. Download and install the APK from the <a href="https://github.com/db1996/TaskerHa/releases/latest" target="_blank">GitHub releases page</a>.
+2. [Download](#download) and install the APK.
 3. Open the TaskerHA app and configure your Home Assistant URL and token.
 4. In Tasker, add an "HA Call service" or "HA Get state" action.
 5. (Optional) Enable websockets in the app and create an "HA On trigger state" profile to react to entity changes.
