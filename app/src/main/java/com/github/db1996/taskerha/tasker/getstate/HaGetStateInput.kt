@@ -1,6 +1,5 @@
 package com.github.db1996.taskerha.tasker.getstate
 
-import com.github.db1996.taskerha.R
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputObject

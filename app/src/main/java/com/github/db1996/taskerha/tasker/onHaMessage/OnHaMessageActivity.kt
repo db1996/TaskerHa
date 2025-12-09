@@ -3,12 +3,10 @@ package com.github.db1996.taskerha.tasker.onHaMessage
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModel
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModelFactory
-import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 

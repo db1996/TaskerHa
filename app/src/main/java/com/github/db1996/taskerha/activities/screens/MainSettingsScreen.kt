@@ -1,13 +1,9 @@
 package com.github.db1996.taskerha.activities.screens
 
 import android.Manifest
-import android.annotation.SuppressLint
-import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
-import android.os.PowerManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.service.HaWebSocketService
-import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -27,7 +22,6 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.content.edit
 import com.github.db1996.taskerha.util.hasNotificationPermission

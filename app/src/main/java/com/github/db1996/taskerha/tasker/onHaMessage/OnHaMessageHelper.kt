@@ -1,10 +1,6 @@
 package com.github.db1996.taskerha.tasker.onHaMessage
 
 import android.content.Context
-import com.github.db1996.taskerha.tasker.ontriggerstate.ActivityConfigOnTriggerState
-import com.github.db1996.taskerha.tasker.ontriggerstate.OnTriggerStateInput
-import com.github.db1996.taskerha.tasker.ontriggerstate.OnTriggerStateRunner
-import com.github.db1996.taskerha.tasker.ontriggerstate.OnTriggerStateUpdate
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
 import com.joaomgcd.taskerpluginlibrary.extensions.requestQuery
