@@ -1,0 +1,4 @@
+Hotifx
+
+- Added notification permissions for persistent websocket connection
+- Added automatic reconnection to websocket when disconnecting wifi etc.
