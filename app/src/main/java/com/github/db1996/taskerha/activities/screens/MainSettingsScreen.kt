@@ -19,9 +19,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.provider.Settings
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Save
 import androidx.core.net.toUri
 import androidx.core.content.edit
 import com.github.db1996.taskerha.util.hasNotificationPermission
@@ -90,14 +94,19 @@ fun MainSettingsScreen(modifier: Modifier, setTopBar: (@Composable () -> Unit) -
             TopAppBar(
                 title = { Text("HA Settings") },
                 actions = {
-                    Button(
+                    FilledIconButton(
                         enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
                         onClick = {
                             HaSettings.save(context, url.trim(), token.trim())
                             setSaved()
-                        }) {
+                        }
+                    ) {
+                        if(saved){
+                            Icon(Icons.Rounded.CheckCircle, contentDescription = "Save settings")
 
-                        Text(if(saved)  "Saved!" else  "Save")
+                        }else{
+                            Icon(Icons.Rounded.Save, contentDescription = "Save settings")
+                        }
                     }
                 }
             )

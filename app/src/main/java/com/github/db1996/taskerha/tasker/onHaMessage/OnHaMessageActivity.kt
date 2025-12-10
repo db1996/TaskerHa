@@ -3,10 +3,13 @@ package com.github.db1996.taskerha.tasker.onHaMessage
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import com.github.db1996.taskerha.activities.screens.OnTriggerStateScreen
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModel
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModelFactory
+import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 
@@ -32,11 +35,15 @@ class OnHaMessageActivity :
         Log.e("OnHaMessageActivity", "onCreate for Tasker config")
 
         viewModel.restoreForm(type, message)
-        helper.finishForTasker()
-//        setContent {
-//            TaskerHaTheme {
-//            }
-//        }
+        setContent {
+            TaskerHaTheme {
+                OnHaMessageScreen(viewModel) { type, message ->
+                    this.type = type
+                    this.message = message
+                    helper.finishForTasker()
+                }
+            }
+        }
     }
 
     override fun assignFromInput(input: TaskerInput<OnHaMessageInput>) {

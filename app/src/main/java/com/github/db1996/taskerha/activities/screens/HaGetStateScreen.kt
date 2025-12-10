@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -61,7 +62,7 @@ fun HaGetStateScreen(
                             onSave(built.entityId)
                         }
                     ) {
-                        Icon(Icons.Rounded.Check, contentDescription = "Save action")
+                        Icon(Icons.Rounded.Save, contentDescription = "Save action")
                     }
                 }
             )

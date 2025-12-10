@@ -12,6 +12,42 @@ class OnHaMessageViewModel() : ViewModel() {
     var form by mutableStateOf(OnHaMessageForm())
         private set
 
+    fun setType(value: String) {
+        form = form.copy(type = value)
+        yamlExample = buildHaMessageYaml(form.type, form.message)
+    }
+
+    fun setMessage(value: String) {
+        form = form.copy(message = value)
+        yamlExample = buildHaMessageYaml(form.type, form.message)
+    }
+
+    var yamlExample by mutableStateOf(buildHaMessageYaml(form.type, form.message))
+        private set
+
+
+    private fun buildHaMessageYaml(
+        type: String,
+        message: String
+    ): String {
+        val sb = StringBuilder()
+        sb.appendLine("event: ha_message")
+        sb.appendLine("event_data:")
+
+        if (type.isNotBlank()) {
+            sb.appendLine("  type: $type")
+        } else {
+            sb.appendLine("  # type: some_type  # optional")
+        }
+
+        if (message.isNotBlank()) {
+            sb.appendLine("  message: $message")
+        } else {
+            sb.appendLine("  # message: \"some message\"  # optional")
+        }
+
+        return sb.toString().trimEnd()
+    }
 
     fun buildForm(): OnHaMessageBuiltForm {
         return OnHaMessageBuiltForm(
@@ -27,5 +63,7 @@ class OnHaMessageViewModel() : ViewModel() {
             this.type = type
             this.message = message
         }
+
+        yamlExample = buildHaMessageYaml(form.type, form.message)
     }
 }

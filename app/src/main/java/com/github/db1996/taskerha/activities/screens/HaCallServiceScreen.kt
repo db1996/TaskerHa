@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -63,7 +64,7 @@ fun HaCallServiceScreen(
                             onSave(built.domain, built.service, built.entityId, built.data)
                         }
                     ) {
-                        Icon(Icons.Rounded.Check, contentDescription = "Save action")
+                        Icon(Icons.Rounded.Save, contentDescription = "Save action")
                     }
                 }
             )
