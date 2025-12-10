@@ -49,6 +49,12 @@ android {
     }
 }
 
+tasks.configureEach {
+    if (name == "compileReleaseArtProfile") {
+        enabled = false
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
