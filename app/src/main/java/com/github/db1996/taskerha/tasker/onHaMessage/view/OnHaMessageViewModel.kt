@@ -31,7 +31,7 @@ class OnHaMessageViewModel() : ViewModel() {
         message: String
     ): String {
         val sb = StringBuilder()
-        sb.appendLine("event: ha_message")
+        sb.appendLine("event: taskerha_message")
         sb.appendLine("event_data:")
 
         if (type.isNotBlank()) {

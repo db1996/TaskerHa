@@ -146,7 +146,7 @@ class HaWebSocketService : Service() {
                             )
 
                             webSocket.send(
-                                """{"id":2,"type":"subscribe_events","event_type":"ha_message"}"""
+                                """{"id":2,"type":"subscribe_events","event_type":"taskerha_message"}"""
                             )
                         }
                         "auth_invalid" -> {
@@ -169,7 +169,7 @@ class HaWebSocketService : Service() {
                             "event" -> {
                                 val ev = envelope.event ?: return
 
-                                if(ev.event_type == "ha_message"){
+                                if(ev.event_type == "taskerha_message"){
                                     Log.d("HaWebSocketService", "HaMessage: ${ev.data?.type}, ${ev.data?.message}")
 
                                     this@HaWebSocketService.triggerOnHaMessageHelper(ev.data?.type,

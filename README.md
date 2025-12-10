@@ -9,6 +9,7 @@ TaskerHA lets you:
 - Call any Home Assistant service from a Tasker action
 - Read the state and attributes of any entity
 - Trigger Tasker profiles when an entity changes state over a websocket connection
+- Send direct messages from HA to tasker with a custom event (uses websocket)
 
 
 Table of contents:
@@ -24,9 +25,12 @@ Table of contents:
     - [Get State action](#get-state-action)
       - [Response in tasker](#response-in-tasker-1)
       - [Error codes](#error-codes-1)
-    - [Trigger state change profile](#trigger-state-change-profile)
+    - [Direct message from ha profile](#direct-message-from-ha-profile)
       - [Response in tasker](#response-in-tasker-2)
       - [Error codes](#error-codes-2)
+    - [Trigger state change profile](#trigger-state-change-profile)
+      - [Response in tasker](#response-in-tasker-3)
+      - [Error codes](#error-codes-3)
 
 
 ## Requirements
@@ -158,6 +162,55 @@ The following variables are available from within tasker after the action
 | 2          | Get entity state call failed. This means that it can connect correctly with Homeassistant but the entity state call itself failed. %errmsg will contain more details               |
 | 3          | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
 
+### Direct message from ha profile
+
+1. Create a new profile in Tasker: plugin -> taskerHa -> HA Direct Message
+2. You can optionally enter text in `type` and `message`
+   - These can be used for filtering, if you enter these in tasker, they have to be filled in homeassistant. 
+   - If you leave it empty it is ignored and you will receive the value.
+
+You can use tasker variables for both fields, make sure to use the "%" for any variable use.
+
+The websocket option in the main app has to be turned on for this. Oterwise it will never fire.
+
+**Example**
+
+Send a message to tasker in an automation with a specific type
+
+In Tasker:
+
+- Profile: Plugin -> TaskerHA -> HA Direct message
+- `type`: some_type (can be left empty to not filter on type)
+- `message`: (leave empty to not filter on message)
+
+In Homeassistant:
+
+- Automations -> new automation -> add action -> Manual event
+- Go in to edit yaml mode (top right 3 dots)
+
+```yaml
+event: taskerha_message
+event_data:
+  type: some_type
+  message: "some message"  # optional
+```
+
+#### Response in tasker
+
+The following variables are available from within tasker after the action
+
+| Variable | Function                                                                                                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_type | Contains the type sent in the event, if                                                                                                                                                                    |
+| %ha_from | Contains the old state of the choosen entity. Example `off`                                                                                                                                                |  |
+| %err     | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
+| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
+
+#### Error codes
+
+| Error code | Description                                                           |
+| ---------- | --------------------------------------------------------------------- |
+| 3          | Unknown error occured. %errmsg will contain more details (java error) |
 
 ### Trigger state change profile
 

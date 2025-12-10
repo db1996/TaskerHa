@@ -1,0 +1,7 @@
+Added features
+- Direct message from HA with filtering options (uses websockst)
+
+Hotifxes
+
+- Couple of errors are fixed for events
+- F-droid manifest change
