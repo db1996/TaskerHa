@@ -56,7 +56,7 @@ fun MainSettingsScreen(
     var url by remember { mutableStateOf(HaSettings.loadUrl(context)) }
     var token by remember { mutableStateOf(HaSettings.loadToken(context)) }
 
-    var status by remember { mutableStateOf<Status>(Status.Idle) }
+    var status by remember { mutableStateOf(Status.Idle) }
     var error by remember { mutableStateOf<String?>(null) }
     var testing by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
@@ -144,7 +144,7 @@ fun MainSettingsScreen(
                 }
             }
         }
-    ) { innerPadding ->
+    ) { _ ->
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {

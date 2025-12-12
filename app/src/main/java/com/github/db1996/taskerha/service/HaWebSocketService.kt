@@ -34,19 +34,17 @@ import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
 
 class HaWebSocketService : Service() {
-
-    private val TAG = "HaWebSocketService"
-
     private val json = Json { ignoreUnknownKeys = true }
     private val TRIGGER_STATE_EVENT_ID = 1
 
     companion object {
+        const val TAG = "HaWebSocketService"
         const val CHANNEL_ID = "ha_websocket_channel"
         const val NOTIFICATION_ID = 1001
 
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
-            Log.e("HaWebSocketService", "start called")
+            CustomLogger.i(TAG, "Attempting to start websocket", LogChannel.WEBSOCKET)
             val intent = Intent(context, HaWebSocketService::class.java)
             context.startForegroundService(intent)
         }
