@@ -1,0 +1,8 @@
+Stability and hotfixes
+
+- Improved websocket stability massively
+    - Errors are caught better, and reestablishing the connection is priority.
+    - Improved stability for when android attempts to kill it (or some weird network connection eerror happens)
+- Added more improved logging, and ability to download logs from app
+    - Set your own log level
+- Made tabs in the main screen for clarity.
