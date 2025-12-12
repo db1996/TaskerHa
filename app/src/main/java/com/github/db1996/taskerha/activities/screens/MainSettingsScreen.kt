@@ -247,6 +247,7 @@ fun MainSettingsScreen(
                         openAppBatterySettings(context)
                         wsEnabled = true
                         HaSettings.saveWebSocketEnabled(context, true)
+                        HaWebSocketService.start(context)
                     }
                 ) { Text("Open settings") }
             },
