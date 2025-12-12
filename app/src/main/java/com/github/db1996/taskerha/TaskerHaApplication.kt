@@ -4,12 +4,14 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
 
 class TaskerHaApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CustomLogger.init(this)
         createForegroundChannel()
     }
 

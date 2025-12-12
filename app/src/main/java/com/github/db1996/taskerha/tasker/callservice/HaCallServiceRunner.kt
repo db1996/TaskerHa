@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.logging.CustomLogger
+import com.github.db1996.taskerha.logging.LogChannel
 import com.joaomgcd.taskerpluginlibrary.action.TaskerPluginRunnerAction
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResult
@@ -15,6 +17,7 @@ import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
 class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallServiceOutput>() {
+    private val TAG = "HaCallServiceRunner"
 
     override fun run(
         context: Context,
@@ -44,6 +47,7 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                         params.dataJson
                     ).mapValues { it.value as Any }
                 } catch (e: Exception) {
+                    CustomLogger.e(TAG, "Invalid JSON Data: ${e.message}", LogChannel.GENERAL, e)
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
                         4,
                         "Invalid JSON Data: ${e.message}"
@@ -66,6 +70,7 @@ class HaCallServiceRunner : TaskerPluginRunnerAction<HaCallServiceInput, HaCallS
                 Log.d("HaCallServiceRunner", "Result: ${client.result}")
                 result = client.result
             } catch (e: Exception) {
+                CustomLogger.e(TAG, "Unknown crash: ${e.message}", LogChannel.GENERAL, e)
                 return@runBlocking TaskerPluginResultErrorWithOutput<HaCallServiceOutput>(
                     3,
                     e.message ?: "Unknown crash"

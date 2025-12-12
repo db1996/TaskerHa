@@ -1,7 +1,7 @@
 package com.github.db1996.taskerha.tasker.onHaMessage
 
 import android.content.Context
-import android.util.Log
+import com.github.db1996.taskerha.logging.CustomLogger
 import com.joaomgcd.taskerpluginlibrary.condition.TaskerPluginRunnerConditionEvent
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
@@ -30,7 +30,7 @@ class OnHaMessageRunner :
             return TaskerPluginResultConditionUnsatisfied()
         }
 
-        Log.d("HaWebSocketService", "update: type=${type}, message=${message}")
+        CustomLogger.i("HaWebSocketService", "update: type=${type}, message=${message}")
         return TaskerPluginResultConditionSatisfied(context, update)
     }
 }

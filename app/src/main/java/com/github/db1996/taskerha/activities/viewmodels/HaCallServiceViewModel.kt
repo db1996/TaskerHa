@@ -25,7 +25,6 @@ class HaCallServiceViewModel(
     var entities: List<HaEntity> by mutableStateOf(emptyList())
         private set
 
-
     var selectedService: ActualService? by mutableStateOf(null)
     var form: HomeassistantForm by mutableStateOf(HomeassistantForm())
 

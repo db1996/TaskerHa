@@ -1,9 +1,10 @@
 package com.github.db1996.taskerha.tasker.getstate
 
 import android.content.Context
-import android.util.Log
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.logging.CustomLogger
+import com.github.db1996.taskerha.logging.LogChannel
 import com.joaomgcd.taskerpluginlibrary.action.TaskerPluginRunnerAction
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResult
@@ -39,9 +40,10 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
                     )
                 }
 
-                Log.d("HaGetStateRunner", "Pinged, getting state ${params.entityId}..")
+                CustomLogger.v("HaGetStateRunner", "Pinged, getting state ${params.entityId}..")
                 val ok = client.getState(params.entityId)
                 if (!ok) {
+                    CustomLogger.e("HaGetStateRunner", "Failed getting state from HA: ${client.error}")
                     return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
                         2,
                         client.error
@@ -66,7 +68,7 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
                     attrsMap
                 )
 
-                Log.d("HaGetStateRunner", "Result, State: $state, Attributes: $attrsJson")
+                CustomLogger.i("HaGetStateRunner", "Result, State: $state, Attributes: $attrsJson")
 
                 TaskerPluginResultSucess(
                     HaGetStateOutput(
@@ -76,6 +78,8 @@ class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOut
                     )
                 )
             } catch (e: Exception) {
+                CustomLogger.e("HaGetStateRunner", "Unknown crash: ${e.message}", LogChannel.GENERAL, e)
+
                 return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
                     3,
                     e.message ?: "Unknown crash"
