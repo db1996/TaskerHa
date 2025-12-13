@@ -35,13 +35,12 @@ fun OnTriggerStateScreen(
     val form = viewModel.form
 
     BaseTaskerConfigScaffold(
-        title = "Get Home Assistant State",
+        title = "On entity trigger state",
         onSave = {
             val built = viewModel.buildForm()
             onSave(built)
         },
-        onTest = { viewModel.testForm() },
-        showTestButton = true
+        showTestButton = false
     ) { padding ->
         Column(
             modifier = Modifier

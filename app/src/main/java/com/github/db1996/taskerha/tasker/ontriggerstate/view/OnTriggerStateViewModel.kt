@@ -80,15 +80,5 @@ class OnTriggerStateViewModel(
             logDebug("Loaded entities: ${entities.size}")
         }
     }
-
-    fun testForm() {
-        val entityId = form.entityId
-        logDebug("Testing get state call: $entityId")
-
-        launchClientOperation { client ->
-            val success = client.getState(entityId)
-            logDebug("Get state ${if (success) "succeeded" else "failed"}, ${client.result}")
-        }
-    }
 }
 

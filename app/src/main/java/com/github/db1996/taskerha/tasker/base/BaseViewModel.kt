@@ -1,6 +1,5 @@
 package com.github.db1996.taskerha.tasker.base
 
-import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue

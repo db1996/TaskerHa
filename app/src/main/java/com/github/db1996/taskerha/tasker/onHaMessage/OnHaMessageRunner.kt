@@ -7,6 +7,7 @@ import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionSatisfied
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionUnsatisfied
+import kotlinx.serialization.json.Json
 
 class OnHaMessageRunner :
     TaskerPluginRunnerConditionEvent<
@@ -14,6 +15,7 @@ class OnHaMessageRunner :
             OnHaMessageOutput,
             OnHaMessageOutput
             >() {
+    private val json = Json { ignoreUnknownKeys = true }
 
     override fun getSatisfiedCondition(
         context: Context,

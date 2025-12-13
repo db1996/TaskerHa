@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaEntity
@@ -13,9 +12,6 @@ import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
 import com.github.db1996.taskerha.tasker.callservice.data.FieldState
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlin.text.orEmpty
 
 class CallServiceViewModel(

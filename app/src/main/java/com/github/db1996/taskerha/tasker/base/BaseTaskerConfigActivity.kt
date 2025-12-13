@@ -3,7 +3,6 @@ package com.github.db1996.taskerha.tasker.base
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModelProvider

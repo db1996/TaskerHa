@@ -4,13 +4,18 @@ import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.tasker.base.BaseViewModel
+import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.onHaMessage.data.OnHaMessageBuiltForm
 import com.github.db1996.taskerha.tasker.onHaMessage.data.OnHaMessageForm
 
-class OnHaMessageViewModel() : ViewModel() {
-    var form by mutableStateOf(OnHaMessageForm())
-        private set
+class OnHaMessageViewModel(
+    client: HomeAssistantClient
+) : BaseViewModel<OnHaMessageForm, OnHaMessageBuiltForm>(
+    initialForm = OnHaMessageForm(),
+    client = client
+) {
 
     fun setType(value: String) {
         form = form.copy(type = value)
@@ -24,7 +29,6 @@ class OnHaMessageViewModel() : ViewModel() {
 
     var yamlExample by mutableStateOf(buildHaMessageYaml(form.type, form.message))
         private set
-
 
     private fun buildHaMessageYaml(
         type: String,
@@ -49,14 +53,6 @@ class OnHaMessageViewModel() : ViewModel() {
         return sb.toString().trimEnd()
     }
 
-    fun buildForm(): OnHaMessageBuiltForm {
-        return OnHaMessageBuiltForm(
-            blurb = "",
-            type = form.type,
-            message = form.message
-        )
-    }
-
     fun restoreForm(type: String, message: String) {
         Log.e("OnHaMessageViewModel", "Restoring form: $type, $message")
         form = OnHaMessageForm().apply {
@@ -66,4 +62,29 @@ class OnHaMessageViewModel() : ViewModel() {
 
         yamlExample = buildHaMessageYaml(form.type, form.message)
     }
+
+    override fun buildForm(): OnHaMessageBuiltForm {
+        return OnHaMessageBuiltForm(
+            blurb = "",
+            type = form.type,
+            message = form.message
+        )
+    }
+
+    override fun restoreForm(data: OnHaMessageBuiltForm) {
+        logVerbose("Restoring form: type=${data.type}, message=${data.message}")
+        form = OnHaMessageForm(
+            type = data.type,
+            message = data.message
+        )
+    }
+
+    override fun createInitialForm(): OnHaMessageForm {
+        return OnHaMessageForm()
+    }
+
+    override fun validateForm(): ValidationResult {
+        return ValidationResult.Valid
+    }
 }
+

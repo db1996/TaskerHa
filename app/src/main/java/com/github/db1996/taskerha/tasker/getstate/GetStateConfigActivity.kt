@@ -10,8 +10,8 @@ import com.github.db1996.taskerha.tasker.getstate.view.HaGetStateViewModel
 import com.github.db1996.taskerha.tasker.getstate.view.HaGetStateViewModelFactory
 
 class GetStateConfigActivity : BaseTaskerConfigActivity<
-    HaGetStateInput,
-    HaGetStateOutput,
+        HaGetStateInput,
+        HaGetStateOutput,
     HaGetStateForm,
     HaGetStateBuiltForm,
     HaGetStateViewModel

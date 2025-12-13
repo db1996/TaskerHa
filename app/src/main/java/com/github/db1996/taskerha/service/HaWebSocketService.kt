@@ -14,7 +14,7 @@ import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.service.data.HaMessageWsEnvelope
 import com.github.db1996.taskerha.service.data.OnTriggerStateWsEnvelope
-import com.github.db1996.taskerha.tasker.onHaMessage.triggerOnHaMessageHelper
+import com.github.db1996.taskerha.tasker.onHaMessage.triggerOnHaMessageHelper2
 import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent2
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -218,7 +218,7 @@ class HaWebSocketService : Service() {
                                     if (ev.event_type == "taskerha_message") {
                                         CustomLogger.i(TAG, "TaskerHaMessage: ${ev.data?.type}, ${ev.data?.message}", LogChannel.WEBSOCKET)
 
-                                        this@HaWebSocketService.triggerOnHaMessageHelper(
+                                        this@HaWebSocketService.triggerOnHaMessageHelper2(
                                             ev.data?.type,
                                             ev.data?.message
                                         )
