@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.github.db1996.taskerha.R
@@ -32,6 +31,9 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.util.logging.Level
+import java.util.logging.Logger
+
 
 class HaWebSocketService : Service() {
     private val json = Json { ignoreUnknownKeys = true }
@@ -64,6 +66,7 @@ class HaWebSocketService : Service() {
     private var webSocket: WebSocket? = null
 
     private val httpClient: OkHttpClient by lazy {
+        Logger.getLogger(OkHttpClient::class.java.getName()).setLevel(Level.FINE)
         OkHttpClient.Builder()
             .pingInterval(30, TimeUnit.SECONDS)
             .build()

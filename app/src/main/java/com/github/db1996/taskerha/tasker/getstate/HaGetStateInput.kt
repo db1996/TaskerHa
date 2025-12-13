@@ -7,14 +7,12 @@ import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
 class HaGetStateInput {
-
     @field:TaskerInputField("entityId")
     var entityId: String = ""
 }
 
 @TaskerOutputObject
 class HaGetStateOutput(
-
     @get:TaskerOutputVariable(
         name = "ha_state",
         labelResIdName = "ha_get_state_state_label",
@@ -33,3 +31,4 @@ class HaGetStateOutput(
     )
     val rawJson: String
 )
+

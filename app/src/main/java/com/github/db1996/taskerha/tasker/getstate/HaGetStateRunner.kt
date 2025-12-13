@@ -2,15 +2,9 @@ package com.github.db1996.taskerha.tasker.getstate
 
 import android.content.Context
 import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.logging.CustomLogger
-import com.github.db1996.taskerha.logging.LogChannel
-import com.joaomgcd.taskerpluginlibrary.action.TaskerPluginRunnerAction
-import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
-import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResult
-import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultErrorWithOutput
-import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultSucess
-import kotlinx.coroutines.runBlocking
+import com.github.db1996.taskerha.tasker.base.BaseTaskerRunner
+import com.github.db1996.taskerha.tasker.base.ErrorCodes
+import com.github.db1996.taskerha.tasker.base.RunnerResult
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
@@ -18,73 +12,64 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-class HaGetStateRunner : TaskerPluginRunnerAction<HaGetStateInput, HaGetStateOutput>() {
-    override fun run(
+class HaGetStateRunner : BaseTaskerRunner<HaGetStateInput, HaGetStateOutput>() {
+
+    override val needsClient = true
+
+    override val logTag: String
+        get() = "HaGetStateRunner"
+
+    override suspend fun executeWithClient(
         context: Context,
-        input: TaskerInput<HaGetStateInput>
-    ): TaskerPluginResult<HaGetStateOutput> {
+        input: HaGetStateInput,
+        client: HomeAssistantClient
+    ): RunnerResult<HaGetStateOutput> {
 
-        return runBlocking {
-            val params = input.regular
-
-            try {
-                val client = HomeAssistantClient(
-                    HaSettings.loadUrl(context),
-                    HaSettings.loadToken(context)
-                )
-
-                if (!client.ping()) {
-                    return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
-                        1,
-                        client.error
-                    )
-                }
-
-                CustomLogger.v("HaGetStateRunner", "Pinged, getting state ${params.entityId}..")
-                val ok = client.getState(params.entityId)
-                if (!ok) {
-                    CustomLogger.e("HaGetStateRunner", "Failed getting state from HA: ${client.error}")
-                    return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
-                        2,
-                        client.error
-                    )
-                }
-
-                val rawJson = client.result
-
-                val jsonElement = Json.Default.parseToJsonElement(rawJson)
-                val obj: JsonObject = jsonElement.jsonObject
-
-                val state = obj["state"]?.jsonPrimitive?.content ?: ""
-
-                val attrsAny = obj["attributes"]?.jsonObject ?: JsonObject(emptyMap())
-
-                val attrsMap: Map<String, String> = attrsAny.mapValues { (_, value) ->
-                    value.toString().trim('"')
-                }
-
-                val attrsJson = Json.Default.encodeToString(
-                    MapSerializer(String.Companion.serializer(), String.serializer()),
-                    attrsMap
-                )
-
-                CustomLogger.i("HaGetStateRunner", "Result, State: $state, Attributes: $attrsJson")
-
-                TaskerPluginResultSucess(
-                    HaGetStateOutput(
-                        state = state,
-                        attributesJson = attrsJson,
-                        rawJson = rawJson
-                    )
-                )
-            } catch (e: Exception) {
-                CustomLogger.e("HaGetStateRunner", "Unknown crash: ${e.message}", LogChannel.GENERAL, e)
-
-                return@runBlocking TaskerPluginResultErrorWithOutput<HaGetStateOutput>(
-                    3,
-                    e.message ?: "Unknown crash"
-                )
+        return try {
+            if(input.entityId.isBlank()){
+                logError("Entity ID cannot be empty")
+                return RunnerResult.Error(ErrorCodes.ERROR_CODE_INVALID_INPUT, "Entity ID cannot be empty")
             }
+
+            logInfo("Getting state for entity: ${input.entityId}")
+            // Get the state (client already pinged by base class)
+            val success = client.getState(input.entityId)
+            if (!success) {
+                logError("Failed getting state from HA: ${client.error}")
+                return RunnerResult.Error(ErrorCodes.ERROR_CODE_API_ERROR, client.error)
+            }
+
+            // Parse the response
+            val rawJson = client.result
+            val jsonElement = Json.parseToJsonElement(rawJson)
+            val obj: JsonObject = jsonElement.jsonObject
+
+            val state = obj["state"]?.jsonPrimitive?.content ?: ""
+
+            val attrsAny = obj["attributes"]?.jsonObject ?: JsonObject(emptyMap())
+
+            val attrsMap: Map<String, String> = attrsAny.mapValues { (_, value) ->
+                value.toString().trim('"')
+            }
+
+            val attrsJson = Json.encodeToString(
+                MapSerializer(String.serializer(), String.serializer()),
+                attrsMap
+            )
+
+            logInfo("Successfully got state: $state, Attributes: $attrsJson")
+
+            RunnerResult.Success(
+                HaGetStateOutput(
+                    state = state,
+                    attributesJson = attrsJson,
+                    rawJson = rawJson
+                )
+            )
+        } catch (e: Exception) {
+            logError("Unknown crash in HaGetStateRunner", e)
+            RunnerResult.Error(ErrorCodes.ERROR_CODE_UNKNOWN, e.message ?: "Unknown crash")
         }
     }
 }
+

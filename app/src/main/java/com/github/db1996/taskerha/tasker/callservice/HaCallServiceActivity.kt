@@ -1,109 +1,73 @@
 package com.github.db1996.taskerha.tasker.callservice
 
-import android.content.Context
-import android.os.Bundle
-import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
-import com.github.db1996.taskerha.activities.screens.HaCallServiceScreen
-import com.github.db1996.taskerha.activities.viewmodels.HaCallServiceViewModel
-import com.github.db1996.taskerha.activities.viewmodels.HaCallServiceViewModelFactory
-import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
-import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
-import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
+import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
+import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
+import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
+import com.github.db1996.taskerha.tasker.callservice.screens.CallServiceScreen
+import com.github.db1996.taskerha.tasker.callservice.view.CallServiceViewModel
+import com.github.db1996.taskerha.tasker.callservice.view.CallServiceViewModelFactory
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 
-class HaCallServiceActivity :
-    AppCompatActivity(),
-    TaskerPluginConfig<HaCallServiceInput> {
+class HaCallServiceActivity : BaseTaskerConfigActivity<
+        CallServiceInput,
+        CallServiceOutput,
+    CallServiceFormForm,
+    CallServiceFormBuiltForm,
+    CallServiceViewModel
+>() {
 
-    override val context: Context
-        get() = applicationContext
-    private val client by lazy {
-        val url = HaSettings.loadUrl(this)
-        val token = HaSettings.loadToken(this)
-        HomeAssistantClient(url, token)
+    override val viewModel: CallServiceViewModel by viewModels { createViewModelFactory() }
+
+    override fun createViewModelFactory() = CallServiceViewModelFactory(this)
+
+    override fun createHelper() = CallServiceConfigHelper(this)
+
+    override fun createScreen(onSave: (CallServiceFormBuiltForm) -> Unit): @Composable () -> Unit = {
+        CallServiceScreen(viewModel, onSave)
     }
 
-    private val viewModel: HaCallServiceViewModel by viewModels {
-        HaCallServiceViewModelFactory(client)
-    }
-    private val taskerHelper by lazy { HaCallServiceConfigHelper(this) }
-    private var selectedDomain: String = ""
-    private var selectedService: String = ""
-    private var selectedEntityId: String = ""
-    private var selectedData: Map<String, String> = emptyMap()
+    override fun convertBuiltFormToInput(builtForm: CallServiceFormBuiltForm): CallServiceInput {
+        val jsonData = Json.encodeToString(
+            MapSerializer(String.serializer(), String.serializer()),
+            builtForm.data
+        )
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        taskerHelper.onCreate()
-
-        setContent {
-            TaskerHaTheme {
-                HaCallServiceScreen(viewModel) { domain, service, entityId, data ->
-                    selectedDomain = domain
-                    selectedService = service
-                    selectedEntityId = entityId
-                    selectedData = data
-
-                    taskerHelper.finishForTasker()
-                }
-            }
+        return CallServiceInput().apply {
+            entityId = builtForm.entityId
+            domain = builtForm.domain
+            service = builtForm.service
+            dataJson = jsonData
         }
     }
 
-    /**
-     * Called by the helper when editing an existing Tasker action.
-     * Convert TaskerInput -> local fields -> restore the UI.
-     */
-    override fun assignFromInput(input: TaskerInput<HaCallServiceInput>) {
-        val params = input.regular
-
-        selectedDomain = params.domain
-        selectedService = params.service
-        selectedEntityId = params.entityId
-
+    override fun convertInputToBuiltForm(input: CallServiceInput): CallServiceFormBuiltForm {
         val dataMap: Map<String, String> = try {
-            Json.Default.decodeFromString(
-                MapSerializer(String.Companion.serializer(), String.serializer()),
-                params.dataJson
+            Json.decodeFromString(
+                MapSerializer(String.serializer(), String.serializer()),
+                input.dataJson
             )
         } catch (_: Exception) {
             emptyMap()
         }
 
-        selectedData = dataMap
-
-        viewModel.restoreForm(
-            selectedDomain,
-            selectedService,
-            selectedEntityId,
-            dataMap
+        return CallServiceFormBuiltForm(
+            entityId = input.entityId,
+            domain = input.domain,
+            service = input.service,
+            data = dataMap,
+            blurb = ""
         )
     }
 
-    /**
-     * Called by the helper when it needs the final input to send back to Tasker.
-     */
-    override val inputForTasker: TaskerInput<HaCallServiceInput>
-        get() {
-            val jsonData = Json.Default.encodeToString(
-                MapSerializer(String.serializer(), String.serializer()),
-                selectedData
-            )
-
-            val haInput = HaCallServiceInput().apply {
-                domain = selectedDomain
-                service = selectedService
-                entityId = selectedEntityId
-                dataJson = jsonData
-            }
-
-            return TaskerInput(haInput)
+    override fun validateBeforeSave(builtForm: CallServiceFormBuiltForm): String? {
+        if (builtForm.entityId.isBlank()) {
+            return "Entity ID cannot be empty"
         }
+        return null
+    }
 }
+

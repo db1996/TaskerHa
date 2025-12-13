@@ -1,6 +1,5 @@
 package com.github.db1996.taskerha.client
 
-import android.util.Log
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaDomainService
 import com.github.db1996.taskerha.datamodels.HaEntity
@@ -9,6 +8,7 @@ import com.github.db1996.taskerha.datamodels.HaServiceField
 import com.github.db1996.taskerha.datamodels.Option
 import com.github.db1996.taskerha.enums.HaServiceFieldType
 import com.github.db1996.taskerha.enums.HomeassistantStatus
+import com.github.db1996.taskerha.logging.CustomLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer
@@ -183,7 +183,7 @@ class HomeAssistantClient(
             if (entityId.isNotEmpty()) payload["entity_id"] = entityId
             data?.let { payload.putAll(it) }
 
-            Log.d("HA client", "Payload: $payload")
+            CustomLogger.v("HA client", "Payload: $payload")
 
             val body = json.encodeToString(
                 MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
@@ -194,6 +194,8 @@ class HomeAssistantClient(
 
             try {
                 val response = http.newCall(req).execute()
+
+                CustomLogger.v("HA client", "Response: ${response}")
                 result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
                     error =

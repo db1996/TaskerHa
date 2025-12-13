@@ -7,7 +7,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.tasker.callservice.data.HaCallServiceBuiltForm
 import com.github.db1996.taskerha.datamodels.HaEntity
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
@@ -25,7 +24,7 @@ class OnTriggerStateViewModel(
         private set
 
     var currentDomainSearch: String by mutableStateOf("")
-    var pendingRestore: HaCallServiceBuiltForm? = null
+    var pendingRestore: OnTriggerStateBuiltForm? = null
     var clientError: String by mutableStateOf("")
 
     fun loadEntities(force: Boolean = false) {
