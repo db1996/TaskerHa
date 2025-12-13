@@ -15,7 +15,7 @@ import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.service.data.HaMessageWsEnvelope
 import com.github.db1996.taskerha.service.data.OnTriggerStateWsEnvelope
 import com.github.db1996.taskerha.tasker.onHaMessage.triggerOnHaMessageHelper
-import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent
+import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent2
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -204,7 +204,7 @@ class HaWebSocketService : Service() {
                                 val ev = envelope.event ?: return
                                 if (ev.event_type == "state_changed") {
                                     CustomLogger.v(TAG, "State changed: ${ev.data?.entity_id}, ${ev.data?.new_state?.state}", LogChannel.WEBSOCKET)
-                                    this@HaWebSocketService.triggerOnTriggerStateEvent(text)
+                                    this@HaWebSocketService.triggerOnTriggerStateEvent2(text)
                                 }
                             }
                         }

@@ -13,17 +13,18 @@ import kotlinx.serialization.json.Json
 class OnTriggerStateRunner :
     TaskerPluginRunnerConditionEvent<
             OnTriggerStateInput,
-            OnTriggerStateUpdate,
-            OnTriggerStateUpdate
+            OnTriggerStateOutput,
+            OnTriggerStateOutput
             >() {
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun getSatisfiedCondition(
         context: Context,
         input: TaskerInput<OnTriggerStateInput>,
-        update: OnTriggerStateUpdate?
-    ): TaskerPluginResultCondition<OnTriggerStateUpdate> {
+        update: OnTriggerStateOutput?
+    ): TaskerPluginResultCondition<OnTriggerStateOutput> {
         if (update?.rawJson.isNullOrBlank()) {
+            CustomLogger.e("OnTriggerStateRunner", "update is null or blank")
             return TaskerPluginResultConditionUnsatisfied()
         }
 
@@ -42,7 +43,6 @@ class OnTriggerStateRunner :
         update.toState = envelope.event?.data?.new_state?.state
         val attrsJson = envelope.event?.data?.new_state?.attributes?.toString()
         update.attributesJson = attrsJson
-
 
         fun matches(configVal: String, eventVal: String?): Boolean {
             if (configVal.isBlank()) return true

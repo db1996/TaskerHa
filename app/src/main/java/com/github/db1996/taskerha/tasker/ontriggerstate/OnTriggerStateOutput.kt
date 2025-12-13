@@ -7,7 +7,7 @@ import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
 @TaskerOutputObject
-class OnTriggerStateUpdate @JvmOverloads constructor(
+class OnTriggerStateOutput @JvmOverloads constructor(
 
     @field:TaskerInputField("rawJson")
     @get:TaskerOutputVariable("ha_raw", labelResIdName = "ha_raw_label")
