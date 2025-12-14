@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModelProvider
 import com.github.db1996.taskerha.logging.CustomLogger
+import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
@@ -55,7 +56,13 @@ import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
  */
 abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM : BaseViewModel<F, B>> :
     AppCompatActivity(),
-    TaskerPluginConfig<I> {
+    TaskerPluginConfig<I>, BaseLogger {
+
+    override val logTag: String
+        get() = this::class.simpleName ?: "BaseTaskerConfigActivity"
+
+    override val logChannel: LogChannel
+        get() = LogChannel.GENERAL
 
     override val context: Context
         get() = applicationContext

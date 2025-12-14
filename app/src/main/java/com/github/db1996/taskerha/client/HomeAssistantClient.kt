@@ -213,6 +213,43 @@ class HomeAssistantClient(
             }
         }
 
+    suspend fun fireEvent(eventType: String, data: Map<String, Any>? = null): Boolean =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
+
+            val payload = mutableMapOf<String, Any>()
+            data?.let { payload.putAll(it) }
+
+            CustomLogger.v("HA client", "Payload: $payload")
+
+            val body = json.encodeToString(
+                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
+                payload.mapValues { JsonPrimitive(it.value.toString()) }
+            )
+
+            val req = request("/api/events/$eventType", "POST", body)
+
+            try {
+                val response = http.newCall(req).execute()
+
+                CustomLogger.v("HA client", "Response: ${response}")
+                result = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    error =
+                        if (response.code == 401) "Unauthorized, check your token" else response.message
+                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                    false
+                } else {
+                    homeAssistantStatus = HomeassistantStatus.CONNECTED
+                    true
+                }
+            } catch (e: IOException) {
+                error = e.toString()
+                homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                false
+            }
+        }
+
     // --- Conversions
     private fun convertService(haService: HaService, serviceId: String, domain: String): ActualService {
         val hasEntityTarget = haService.target?.containsKey("entity") ?: false

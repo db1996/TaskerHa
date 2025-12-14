@@ -14,6 +14,7 @@ import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.service.data.HaMessageWsEnvelope
 import com.github.db1996.taskerha.service.data.OnTriggerStateWsEnvelope
+import com.github.db1996.taskerha.tasker.base.BaseLogger
 import com.github.db1996.taskerha.tasker.onHaMessage.triggerOnHaMessageHelper2
 import com.github.db1996.taskerha.tasker.ontriggerstate.triggerOnTriggerStateEvent2
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -35,9 +36,15 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 
-class HaWebSocketService : Service() {
+class HaWebSocketService : Service(), BaseLogger {
     private val json = Json { ignoreUnknownKeys = true }
     private val TRIGGER_STATE_EVENT_ID = 1
+
+    override val logTag: String
+        get() = "HaWebSocketService"
+
+    override val logChannel: LogChannel
+        get() = LogChannel.WEBSOCKET
 
     companion object {
         const val TAG = "HaWebSocketService"
@@ -47,6 +54,7 @@ class HaWebSocketService : Service() {
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
             CustomLogger.i(TAG, "Attempting to start websocket", LogChannel.WEBSOCKET)
+
             val intent = Intent(context, HaWebSocketService::class.java)
             context.startForegroundService(intent)
         }
@@ -58,7 +66,7 @@ class HaWebSocketService : Service() {
     }
 
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, t ->
-        CustomLogger.e(TAG, "coroutine crashed", LogChannel.WEBSOCKET, t)
+        logError("coroutine crashed", t)
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + coroutineExceptionHandler)
@@ -83,6 +91,20 @@ class HaWebSocketService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        logVerbose("Websocket startcommand action=${intent?.action} flags=$flags startId=$startId pid=${android.os.Process.myPid()}")
+
+        startForeground(NOTIFICATION_ID, buildNotification("Connecting to Home Assistant..."))
+
+        if (!isShuttingDown && webSocket == null && reconnectJob?.isActive != true) {
+            runCatching { connectWebSocket() }
+                .onFailure { t -> logError("connectWebSocket failed from onStartCommand", t) }
+        }
+
+        return START_STICKY
+    }
+
+
     override fun onCreate() {
         super.onCreate()
 
@@ -91,8 +113,10 @@ class HaWebSocketService : Service() {
             buildNotification("Connecting to Home Assistant...")
         )
 
+        logInfo("Starting websocket service")
+
         runCatching { connectWebSocket() }
-            .onFailure { t -> CustomLogger.e(TAG, "connectWebSocket failed", LogChannel.WEBSOCKET, t) }
+            .onFailure { t -> logError("connectWebSocket failed", t) }
     }
 
     override fun onDestroy() {
@@ -103,8 +127,9 @@ class HaWebSocketService : Service() {
 
         try {
             webSocket?.close(1000, "Service stopped")
+            logError("Stopped websocket service")
         } catch (t: Throwable) {
-            CustomLogger.e(TAG, "webSocket.close() in onDestroy failed", LogChannel.WEBSOCKET, t)
+            logError("webSocket.close() in onDestroy failed", t)
         } finally {
             webSocket = null
         }
@@ -117,8 +142,9 @@ class HaWebSocketService : Service() {
             .setSmallIcon(R.drawable.ic_notification_icon)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 
@@ -127,7 +153,7 @@ class HaWebSocketService : Service() {
             val manager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
             manager.notify(NOTIFICATION_ID, buildNotification(text))
         } catch (t: Throwable) {
-            CustomLogger.e(TAG, "updateNotification crashed", LogChannel.WEBSOCKET, t)
+            logError("updateNotification failed", t)
         }
     }
 
@@ -136,7 +162,7 @@ class HaWebSocketService : Service() {
         val token = HaSettings.loadToken(this)
 
         if (url.isBlank() || token.isBlank()) {
-            CustomLogger.e(TAG, "URL or token blank, stopping service", LogChannel.WEBSOCKET)
+            logError("URL or token blank, stopping service")
             stopSelf()
             return
         }
@@ -148,10 +174,14 @@ class HaWebSocketService : Service() {
             .replace("http://", "ws://")
             .trimEnd('/') + "/api/websocket"
 
+        if(!wsUrl.startsWith("ws://") && !wsUrl.startsWith("wss://")) {
+            logError("Invalid URL: $wsUrl")
+            return
+        }
         try {
             webSocket?.cancel()
         } catch (t: Throwable) {
-            CustomLogger.e(TAG, "webSocket.cancel() failed", LogChannel.WEBSOCKET, t)
+            logError("webSocket.cancel() failed", t)
         }
         webSocket = null
 
@@ -163,26 +193,26 @@ class HaWebSocketService : Service() {
 
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 try {
-                    CustomLogger.i(TAG, "WebSocket opened", LogChannel.WEBSOCKET)
+                    logInfo("WebSocket opened")
                     reconnectAttempts = 0
                     reconnectJob?.cancel()
                     updateNotification("Authenticating with Home Assistant...")
                     webSocket.send("{\"type\": \"auth\", \"access_token\": \"$token\"}")
                 } catch (t: Throwable) {
-                    CustomLogger.e(TAG, "onOpen crashed", LogChannel.WEBSOCKET, t)
+                    logError("onOpen crashed", t)
                 }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
-                    CustomLogger.v(TAG, "onMessage: $text", LogChannel.WEBSOCKET)
+                    logVerbose("onMessage: $text")
 
                     try {
                         val envelope = json.decodeFromString<OnTriggerStateWsEnvelope>(text)
 
                         when (envelope.type) {
                             "auth_ok" -> {
-                                CustomLogger.i(TAG, "Auth OK, subscribing to events", LogChannel.WEBSOCKET)
+                                logInfo("Auth OK, subscribing to events")
                                 updateNotification("Connected to Home Assistant")
                                 reconnectAttempts = 0
                                 reconnectJob?.cancel()
@@ -196,14 +226,14 @@ class HaWebSocketService : Service() {
                             }
 
                             "auth_invalid" -> {
-                                CustomLogger.e(TAG, "Auth invalid, stopping service", LogChannel.WEBSOCKET)
+                                logError("Auth invalid, stopping service")
                                 stopSelf()
                             }
 
                             "event" -> {
                                 val ev = envelope.event ?: return
                                 if (ev.event_type == "state_changed") {
-                                    CustomLogger.v(TAG, "State changed: ${ev.data?.entity_id}, ${ev.data?.new_state?.state}", LogChannel.WEBSOCKET)
+                                    logVerbose("State changed: ${ev.data?.entity_id}, ${ev.data?.new_state?.state}")
                                     this@HaWebSocketService.triggerOnTriggerStateEvent2(text)
                                 }
                             }
@@ -216,8 +246,7 @@ class HaWebSocketService : Service() {
                                 "event" -> {
                                     val ev = envelope.event ?: return
                                     if (ev.event_type == "taskerha_message") {
-                                        CustomLogger.i(TAG, "TaskerHaMessage: ${ev.data?.type}, ${ev.data?.message}", LogChannel.WEBSOCKET)
-
+                                        logInfo("TaskerHaMessage: ${ev.data?.type}, ${ev.data?.message}")
                                         this@HaWebSocketService.triggerOnHaMessageHelper2(
                                             ev.data?.type,
                                             ev.data?.message
@@ -226,35 +255,34 @@ class HaWebSocketService : Service() {
                                 }
                             }
                         } catch (e2: Exception) {
-                            CustomLogger.v(TAG, "Not HaMessage: ${e2.message}", LogChannel.WEBSOCKET)
+                            logVerbose("Not HaMessage: ${e2.message}")
                             return
                         }
                     }
                 } catch (t: Throwable) {
-                    CustomLogger.e(TAG, "onMessage crashed", LogChannel.WEBSOCKET, t)
+                    logError("onMessage crashed", t)
                 }
             }
 
             override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 try {
-                    CustomLogger.e(TAG, "onClosing: $code $reason")
+                    logError("onClosing: $code $reason")
                     runCatching { webSocket.close(code, reason) }
-                        .onFailure { t -> CustomLogger.e(TAG, "webSocket.close() failed", LogChannel.WEBSOCKET, t) }
+                        .onFailure { t -> logError("webSocket.close() failed", t) }
 
                     this@HaWebSocketService.webSocket = null
                     scheduleReconnect("onClosing $code $reason")
                 } catch (t: Throwable) {
-                    CustomLogger.e(TAG, "onClosing callback crashed", LogChannel.WEBSOCKET, t)
+                    logError("onClosing callback crashed", t)
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 try {
-                    CustomLogger.e(TAG, "onFailure: ${t.message}", LogChannel.WEBSOCKET, t)
+                    logError("onFailure: ${t.message}", t)
                     this@HaWebSocketService.webSocket = null
-                    scheduleReconnect("onFailure: ${t.message}")
                 } catch (t2: Throwable) {
-                    CustomLogger.e(TAG, "onFailure callback crashed", LogChannel.WEBSOCKET, t2)
+                    logError("onFailure callback crashed", t)
                 }
             }
         })
@@ -262,12 +290,12 @@ class HaWebSocketService : Service() {
 
     private fun scheduleReconnect(reason: String? = null) {
         if (isShuttingDown) {
-            CustomLogger.d(TAG, "Not scheduling reconnect, service shutting down")
+            logInfo("Not scheduling reconnect, service shutting down")
             return
         }
 
         if (reconnectJob?.isActive == true) {
-            CustomLogger.d(TAG, "Reconnect already scheduled, skipping")
+            logDebug("Reconnect already scheduled, skipping")
             return
         }
 
@@ -275,7 +303,7 @@ class HaWebSocketService : Service() {
         val delayMs = (baseReconnectDelayMs * factor).coerceAtMost(maxReconnectDelayMs)
         reconnectAttempts = (reconnectAttempts + 1).coerceAtMost(10)
 
-        CustomLogger.i(TAG, "Scheduling reconnect in ${delayMs}ms (attempt=$reconnectAttempts, reason=$reason)")
+        logInfo("Scheduling reconnect in ${delayMs}ms (attempt=$reconnectAttempts, reason=$reason)")
         updateNotification("Reconnecting to Home Assistant...")
 
         reconnectJob = serviceScope.launch {
@@ -283,8 +311,7 @@ class HaWebSocketService : Service() {
             try {
                 connectWebSocket()
             } catch (t: Throwable) {
-                CustomLogger.e(TAG, "connectWebSocket failed", LogChannel.WEBSOCKET, t)
-                // If connect itself is crashing, try again later instead of dying.
+                logError("connectWebSocket failed",t)
                 scheduleReconnect("connectWebSocket crash: ${t.message}")
             }
         }

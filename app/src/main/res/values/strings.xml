@@ -15,4 +15,6 @@
 
     <string name="on_ha_message_type_label">Type (optional), can be anything custom</string>
     <string name="on_ha_message_message_label">Message (optional), can be anything custom</string>
+
+    <string name="on_ha_raw_json_label">Raw JSON response of the api call</string>
 </resources>
