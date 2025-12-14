@@ -1,11 +1,9 @@
 package com.github.db1996.taskerha.tasker.messageback.view
 
-import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.tasker.base.BaseLogger
 import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackForm

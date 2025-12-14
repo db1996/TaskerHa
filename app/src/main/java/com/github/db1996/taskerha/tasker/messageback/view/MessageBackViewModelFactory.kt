@@ -3,7 +3,6 @@ package com.github.db1996.taskerha.tasker.messageback.view
 import android.content.Context
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.tasker.base.ClientViewModelFactory
-import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModel
 
 class MessageBackViewModelFactory(
     context: Context

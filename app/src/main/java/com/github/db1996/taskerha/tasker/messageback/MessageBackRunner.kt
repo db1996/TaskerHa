@@ -7,7 +7,6 @@ import com.github.db1996.taskerha.tasker.base.ErrorCodes
 import com.github.db1996.taskerha.tasker.base.RunnerResult
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackInput
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackOutput
-import kotlinx.serialization.builtins.MapSerializer
 
 class MessageBackRunner : BaseTaskerRunner<MessageBackInput, MessageBackOutput>() {
 

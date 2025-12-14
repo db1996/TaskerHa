@@ -1,7 +1,6 @@
 package com.github.db1996.taskerha.tasker.messageback.data
 
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
-import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputObject
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 

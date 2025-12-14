@@ -92,11 +92,10 @@ class HaWebSocketService : Service(), BaseLogger {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        logVerbose("Websocket startcommand action=${intent?.action} flags=$flags startId=$startId pid=${android.os.Process.myPid()}")
-
         startForeground(NOTIFICATION_ID, buildNotification("Connecting to Home Assistant..."))
 
         if (!isShuttingDown && webSocket == null && reconnectJob?.isActive != true) {
+            logInfo("Starting websocket service from onStartCommand")
             runCatching { connectWebSocket() }
                 .onFailure { t -> logError("connectWebSocket failed from onStartCommand", t) }
         }
@@ -113,7 +112,7 @@ class HaWebSocketService : Service(), BaseLogger {
             buildNotification("Connecting to Home Assistant...")
         )
 
-        logInfo("Starting websocket service")
+        logInfo("Starting websocket service from onCreate")
 
         runCatching { connectWebSocket() }
             .onFailure { t -> logError("connectWebSocket failed", t) }
@@ -246,7 +245,7 @@ class HaWebSocketService : Service(), BaseLogger {
                                 "event" -> {
                                     val ev = envelope.event ?: return
                                     if (ev.event_type == "taskerha_message") {
-                                        logInfo("TaskerHaMessage: ${ev.data?.type}, ${ev.data?.message}")
+                                        logInfo("taskerha_message detected: type=${ev.data?.type}, message=${ev.data?.message}")
                                         this@HaWebSocketService.triggerOnHaMessageHelper2(
                                             ev.data?.type,
                                             ev.data?.message
