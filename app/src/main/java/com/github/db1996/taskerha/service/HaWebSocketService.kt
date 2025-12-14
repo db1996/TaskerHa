@@ -177,6 +177,9 @@ class HaWebSocketService : Service(), BaseLogger {
             logError("Invalid URL: $wsUrl")
             return
         }
+
+        logInfo("Connecting to $wsUrl")
+
         try {
             webSocket?.cancel()
         } catch (t: Throwable) {
