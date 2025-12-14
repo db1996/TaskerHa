@@ -84,7 +84,8 @@ fun CallServiceScreen(
                         currentEntityId = form.entityId,
                         searching = entitySearching,
                         onSearchChanged = { entitySearching = it },
-                        onEntitySelected = { viewModel.pickEntity(it) }
+                        onEntitySelected = { viewModel.pickEntity(it) },
+                        onEntityIdChanged = { viewModel.pickEntity(it) }
                     )
                 }
 

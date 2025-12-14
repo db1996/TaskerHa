@@ -31,6 +31,10 @@ class HaGetStateViewModel(
         form = form.copy(entityId = entityId)
     }
 
+    fun updateEntityId(entityId: String){
+        form = form.copy(entityId = entityId)
+    }
+
     override fun buildForm(): HaGetStateBuiltForm {
         return HaGetStateBuiltForm(
             entityId = form.entityId,

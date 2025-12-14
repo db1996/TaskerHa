@@ -75,7 +75,8 @@ fun HaGetStateScreen(
                 currentEntityId = form.entityId,
                 searching = entitySearching,
                 onSearchChanged = { entitySearching = it },
-                onEntitySelected = { viewModel.pickEntity(it) }
+                onEntitySelected = { viewModel.pickEntity(it) },
+                onEntityIdChanged = { viewModel.updateEntityId( it)}
             )
         }
     }

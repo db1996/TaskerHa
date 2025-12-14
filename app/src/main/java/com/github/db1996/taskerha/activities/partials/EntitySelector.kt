@@ -23,6 +23,7 @@ fun EntitySelector(
     currentEntityId: String,
     searching: Boolean,
     onSearchChanged: (Boolean) -> Unit,
+    onEntityIdChanged: (String) -> Unit = {},
     onEntitySelected: (String) -> Unit,
     modifier: Modifier = Modifier // allow parent to control size if needed
 ) {
@@ -53,13 +54,23 @@ fun EntitySelector(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = if (searching) searchQuery else currentEntityId,
-                onValueChange = { searchQuery = it },
-                label = { Text("Entity ID") },
-                singleLine = true,
-                modifier = Modifier.weight(1f)
-            )
+            if(searching){
+                OutlinedTextField(
+                    value = searchQuery ,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search ID") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }else{
+                OutlinedTextField(
+                    value = currentEntityId,
+                    onValueChange = { onEntityIdChanged(it)},
+                    label = { Text("Entity ID") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             if (!searching) {
                 Button(onClick = { onSearchChanged(true) }) { Text("Search") }
