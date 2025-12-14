@@ -45,9 +45,6 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
     }
 
     override fun validateBeforeSave(builtForm: OnTriggerStateBuiltForm): String? {
-        if (builtForm.entityId.isBlank()) {
-            return "Entity ID cannot be empty"
-        }
         return null
     }
 }

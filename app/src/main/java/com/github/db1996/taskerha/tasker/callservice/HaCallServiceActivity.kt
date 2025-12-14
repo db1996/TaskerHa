@@ -64,9 +64,6 @@ class HaCallServiceActivity : BaseTaskerConfigActivity<
     }
 
     override fun validateBeforeSave(builtForm: CallServiceFormBuiltForm): String? {
-        if (builtForm.entityId.isBlank()) {
-            return "Entity ID cannot be empty"
-        }
         return null
     }
 }

@@ -27,7 +27,6 @@ fun HaGetStateScreen(
 ) {
     var entitySearching by remember { mutableStateOf(false) }
 
-    // Load entities on first composition
     LaunchedEffect(Unit) {
         viewModel.loadEntities()
     }
@@ -58,7 +57,6 @@ fun HaGetStateScreen(
                 Text("Please check your connection settings in the main app outside of tasker")
             }
 
-            // Domain search filter
             if (entitySearching) {
                 TextField(
                     value = viewModel.currentDomainSearch,
@@ -68,7 +66,6 @@ fun HaGetStateScreen(
                 )
             }
 
-            // Entity selector
             EntitySelector(
                 entities = viewModel.entities,
                 serviceDomain = viewModel.currentDomainSearch,
@@ -76,7 +73,7 @@ fun HaGetStateScreen(
                 searching = entitySearching,
                 onSearchChanged = { entitySearching = it },
                 onEntitySelected = { viewModel.pickEntity(it) },
-                onEntityIdChanged = { viewModel.updateEntityId( it)}
+                onEntityIdChanged = { viewModel.updateEntityId( it)},
             )
         }
     }

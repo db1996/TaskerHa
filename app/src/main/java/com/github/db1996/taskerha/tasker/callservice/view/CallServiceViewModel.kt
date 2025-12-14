@@ -160,9 +160,6 @@ class CallServiceViewModel(
     }
 
     override fun validateForm(): ValidationResult {
-        if (form.entityId.isBlank()) {
-            return ValidationResult.Invalid("Entity ID cannot be empty")
-        }
         return ValidationResult.Valid
     }
 

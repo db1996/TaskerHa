@@ -6,11 +6,15 @@ import android.app.NotificationManager
 import android.os.Build
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
+import com.github.db1996.taskerha.util.EntityRecents
+import com.github.db1996.taskerha.util.ServiceRecents
 
 class TaskerHaApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        EntityRecents.init(this)
+        ServiceRecents.init(this)
         CustomLogger.init(this)
         createForegroundChannel()
     }

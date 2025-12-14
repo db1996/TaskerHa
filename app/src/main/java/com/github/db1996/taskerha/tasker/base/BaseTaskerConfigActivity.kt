@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModelProvider
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
+import com.github.db1996.taskerha.util.EntityRecents
+import com.github.db1996.taskerha.util.HasEntityIds
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
@@ -136,12 +138,14 @@ abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM :
      * Handle the save action from the UI
      */
     private fun handleSave(builtForm: B) {
-        // Optional validation
         val validationError = validateBeforeSave(builtForm)
         if (validationError != null) {
-            // Could show a toast or dialog here
             CustomLogger.e("BaseTaskerConfigActivity", "Validation failed: $validationError")
             return
+        }
+
+        if (builtForm is HasEntityIds) {
+            EntityRecents.addAll(builtForm.entityIds())
         }
 
         currentBuiltForm = builtForm
@@ -155,7 +159,6 @@ abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM :
         val builtForm = convertInputToBuiltForm(input.regular)
         currentBuiltForm = builtForm
         viewModel.restoreForm(builtForm)
-        CustomLogger.e("CallServiceViewModel", "assignFromInput: $builtForm")
     }
 
     /**
