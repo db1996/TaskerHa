@@ -43,13 +43,17 @@ class OnTriggerStateViewModel(
         form = form.copy(toState = toState)
     }
 
+    fun setFor(forDuration: String){
+        form = form.copy(forDuration = forDuration)
+    }
 
     override fun buildForm(): OnTriggerStateBuiltForm {
         return OnTriggerStateBuiltForm(
             entityId = form.entityId,
             fromState = form.fromState,
             toState = form.toState,
-            blurb = "Get state: ${form.entityId}"
+            blurb = "Get state: ${form.entityId}",
+            forDuration = form.forDuration
         )
     }
 
@@ -58,7 +62,8 @@ class OnTriggerStateViewModel(
         form = OnTriggerStateForm(
             entityId = data.entityId,
             fromState = data.fromState,
-            toState = data.toState
+            toState = data.toState,
+            forDuration = data.forDuration
         )
     }
 

@@ -25,6 +25,11 @@ class OnTriggerStateOutput @JvmOverloads constructor(
     @get:TaskerOutputVariable("ha_to", labelResIdName = "ha_on_trigger_to_label")
     var toState: String? = null,
 
+    @field:TaskerInputField("forDuration")
+    @get:TaskerOutputVariable("ha_for", labelResIdName = "ha_on_trigger_for_label")
+    var forDuration: String? = null,
+
+
     @field:TaskerInputField("attributesJson")
     @get:TaskerOutputVariable("ha_attrs", labelResIdName = "ha_on_trigger_attrs_label")
     var attributesJson: String? = null

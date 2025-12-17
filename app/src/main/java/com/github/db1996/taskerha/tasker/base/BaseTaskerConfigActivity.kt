@@ -11,6 +11,8 @@ import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.github.db1996.taskerha.util.EntityRecents
 import com.github.db1996.taskerha.util.HasEntityIds
+import com.github.db1996.taskerha.util.PrefsJsonStore
+import com.github.db1996.taskerha.util.SavePrefsJson
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfigHelper
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
@@ -146,6 +148,10 @@ abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM :
 
         if (builtForm is HasEntityIds) {
             EntityRecents.addAll(builtForm.entityIds())
+        }
+
+        if (builtForm is SavePrefsJson) {
+            PrefsJsonStore.add(builtForm)
         }
 
         currentBuiltForm = builtForm

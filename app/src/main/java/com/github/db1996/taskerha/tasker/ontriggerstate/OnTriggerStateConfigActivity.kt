@@ -32,6 +32,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
             entityId = builtForm.entityId
             fromState = builtForm.fromState
             toState = builtForm.toState
+            forDuration = builtForm.forDuration
         }
     }
 
@@ -40,6 +41,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
             entityId = input.entityId,
             fromState = input.fromState,
             toState = input.toState,
+            forDuration = input.forDuration,
             blurb = "Get state: ${input.entityId}"
         )
     }

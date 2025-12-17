@@ -1,5 +1,6 @@
 package com.github.db1996.taskerha.tasker.ontriggerstate.screens
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -89,6 +90,12 @@ fun OnTriggerStateScreen(
                     value = form.toState,
                     onValueChange = { viewModel.setTo(it) },
                     label = { Text("To") },
+                )
+                Log.e("TESTTESTTEST", "${form.forDuration}")
+                DurationHmsStringField(
+                    value = form.forDuration,
+                    onValueChange = { viewModel.setFor(it) },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
