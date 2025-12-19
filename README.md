@@ -44,15 +44,13 @@ Table of contents:
 <a  href="https://github.com/db1996/TaskerHa/releases/latest">
 <img width="150" height="auto" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png"
 alt="Download from GitHub releases" /></a>
-<!-- <a  href="https://f-droid.org/packages/com.github.db1996.taskerha/"> -->
-<!-- <img width="150" height="auto" src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" -->
-<!-- alt="Download from fdroid" /></a> -->
+<a  href="https://f-droid.org/packages/com.github.db1996.taskerha/">
+<img width="150" height="auto" src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
+<!-- alt="Download from fdroid" /></a>
 
 
 ![GitHub All Releases](https://img.shields.io/github/downloads/db1996/TaskerHa/total)
-<!-- ![F-Droid Version](https://img.shields.io/f-droid/v/com.github.db1996.taskerha) -->
-
-F-droid release coming soon
+![F-Droid Version](https://img.shields.io/f-droid/v/com.github.db1996.taskerha)
 
 <!-- NOTE: You can not install the f-droid release next to the github release. You will have to uninstall and reinstall the version you want. Tasks/profiles should keep working but you'll have to configure your server again. -->
 
@@ -71,7 +69,7 @@ F-droid release coming soon
 ### Setup
 
 1. <a href="https://www.home-assistant.io/docs/authentication/" target="_blank">Create a Long-lived access token</a> in your Homeassistant. And save it for later in the process.
-2. Install the app. For now, the APK is available <a href="https://github.com/db1996/TaskerHa/releases/latest" target="_blank">here in releases</a>, but in the future it will be available on f-droid (hopefully)
+2. Install the app. The APK is available <a href="https://github.com/db1996/TaskerHa/releases/latest" target="_blank">here in releases</a>, and <a href="https://f-droid.org/packages/com.github.db1996.taskerha" target="_blank">here on f-droid</a>
 3. Open the app (outside of tasker) and fill in your Homeassistant server details. This works both over localhost and remote
    - Use the scheme and optionally the port in the url. Example: `http://192.168.1.xxx:8123` for a local instance. Or `https://ha.yourdomain.com`. For proxy servers you do **not** need to use a port.
    - Do not use a trailing backslash in the host.
