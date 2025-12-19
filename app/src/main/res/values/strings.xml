@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">TaskerHa</string>
+    <string name="app_name">TaskerHA</string>
 
     <string name="ha_raw_label">Raw response (JSON)</string>
 

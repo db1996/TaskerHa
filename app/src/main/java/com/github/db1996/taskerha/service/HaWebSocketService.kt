@@ -97,8 +97,12 @@ class HaWebSocketService : Service(), BaseLogger {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification("Connecting to Home Assistant..."))
+        if (!startForegroundSafely("Connecting to Home Assistant...")) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         if (!isShuttingDown && webSocket == null && reconnectJob?.isActive != true) {
             logInfo("Starting websocket service from onStartCommand")
@@ -109,20 +113,38 @@ class HaWebSocketService : Service(), BaseLogger {
         return START_STICKY
     }
 
-
-    override fun onCreate() {
-        super.onCreate()
-
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification("Connecting to Home Assistant...")
-        )
-
-        logInfo("Starting websocket service from onCreate")
-
-        runCatching { connectWebSocket() }
-            .onFailure { t -> logError("connectWebSocket failed", t) }
+    @RequiresApi(35)
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        logError("FGS onTimeout called (fgsType=$fgsType) -> stopping")
+        stopSelf()
     }
+
+
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun startForegroundSafely(text: String): Boolean {
+        val notification = buildNotification(text)
+
+        return try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                androidx.core.app.ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+                )
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            true
+        } catch (e: android.app.ForegroundServiceStartNotAllowedException) {
+            logError("startForeground blocked: ${e.message}", e)
+            false
+        } catch (t: Throwable) {
+            logError("startForeground failed", t)
+            false
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
