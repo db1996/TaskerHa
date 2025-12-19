@@ -50,7 +50,6 @@ alt="Download from GitHub releases" /></a>
 
 
 ![GitHub All Releases](https://img.shields.io/github/downloads/db1996/TaskerHa/total)
-![F-Droid Version](https://img.shields.io/f-droid/v/com.github.db1996.taskerha)
 
 <!-- NOTE: You can not install the f-droid release next to the github release. You will have to uninstall and reinstall the version you want. Tasks/profiles should keep working but you'll have to configure your server again. -->
 
