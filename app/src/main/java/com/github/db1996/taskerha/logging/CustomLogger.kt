@@ -17,8 +17,8 @@ import androidx.core.content.FileProvider
 
 object CustomLogger {
 
-    private const val GENERAL_BASE = "taskerha.log"
-    private const val WS_BASE = "taskerha_ws.log"
+    private const val GENERAL_BASE = "taskerha.txt"
+    private const val WS_BASE = "taskerha_ws.txt"
 
     private const val MAX_BYTES = 512 * 1024 // 512KB per file
     private const val MAX_ROTATIONS = 10
@@ -150,15 +150,15 @@ object CustomLogger {
     // ===== Rotation helpers (auto-numbered) =====
 
     private fun rotatedFile(dir: File, base: String, index: Int): File =
-        if (index == 0) File(dir, base) else File(dir, "$base.$index")
+        if (index == 0) File(dir, base) else File(dir, "$index.$base")
 
     private fun findHighestRotationIndex(dir: File, base: String): Int {
         var max = 0
         dir.listFiles()?.forEach { f ->
             val name = f.name
             if (name == base) return@forEach
-            if (name.startsWith("$base.")) {
-                val suffix = name.substringAfter("$base.", "")
+            if (name.endsWith(".$base")) {
+                val suffix = name.substringBefore(".$base", "")
                 val n = suffix.toIntOrNull()
                 if (n != null && n > max) max = n
             }

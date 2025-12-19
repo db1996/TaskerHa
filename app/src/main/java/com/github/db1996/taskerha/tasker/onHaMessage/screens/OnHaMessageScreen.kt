@@ -1,10 +1,5 @@
-package com.github.db1996.taskerha.tasker.onHaMessage
+package com.github.db1996.taskerha.tasker.onHaMessage.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.util.Log
-import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,52 +10,37 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
+import com.github.db1996.taskerha.tasker.onHaMessage.data.OnHaMessageBuiltForm
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModel
+import com.github.db1996.taskerha.util.copyToClipboard
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnHaMessageScreen(
     viewModel: OnHaMessageViewModel,
-    onSave: (type: String, message: String) -> Unit
+    onSave: (OnHaMessageBuiltForm) -> Unit
 ) {
-
     val context = LocalContext.current
-
     val form = viewModel.form
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Configure Action") },
-                actions = {
-                    FilledIconButton(
-                        onClick = {
-                            Log.d("OnHaMessageScreen", "Saving action with data: ${form.type} ${form.message}")
-                            val built = viewModel.buildForm()
-                            onSave(built.type, built.message)
-                        }
-                    ) {
-                        Icon(Icons.Rounded.Save, contentDescription = "Save profile")
-                    }
-                }
-            )
-        }
+    BaseTaskerConfigScaffold(
+        title = "Direct message from HA",
+        onSave = {
+            val built = viewModel.buildForm()
+            onSave(built)
+        },
+        showTestButton = false
     ) { padding ->
         Column(
             modifier = Modifier
@@ -103,7 +83,7 @@ fun OnHaMessageScreen(
                                 copyToClipboard(
                                     context,
                                     viewModel.yamlExample,
-                                    "Home Assistant event YAML"
+                                    "Home Assistant event YAML copied!"
                                 )
                             }
                         ) {
@@ -139,14 +119,4 @@ fun OnHaMessageScreen(
             }
         }
     }
-
-}
-fun copyToClipboard(
-    context: Context,
-    text: String,
-    label: String = "Copied text"
-) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(context, "YAML copied to clipboard", Toast.LENGTH_SHORT).show()
 }

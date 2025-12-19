@@ -1,20 +1,13 @@
-package com.github.db1996.taskerha.activities.screens
+package com.github.db1996.taskerha.tasker.ontriggerstate.screens
 
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,40 +17,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
-import com.github.db1996.taskerha.activities.viewmodels.OnTriggerStateViewModel
+import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
+import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
+import com.github.db1996.taskerha.tasker.ontriggerstate.view.OnTriggerStateViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnTriggerStateScreen(
     viewModel: OnTriggerStateViewModel,
-    onSave: (entityId: String, fromState: String, toState: String) -> Unit
+    onSave: (OnTriggerStateBuiltForm) -> Unit
 ) {
     var entitySearching by remember { mutableStateOf(false) }
 
-    // Load on first composition
+    // Load entities on first composition
     LaunchedEffect(Unit) {
         viewModel.loadEntities()
     }
+
     val form = viewModel.form
 
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Configure Action") },
-                actions = {
-                    FilledIconButton(
-                        onClick = {
-                            Log.d("HaGetStateScreen", "Saving action with data: ${form.entityId}, ${form.fromState}, ${form.toState}")
-                            val built = viewModel.buildForm()
-                            onSave(built.entityId, built.fromState, built.toState)
-                        }
-                    ) {
-                        Icon(Icons.Rounded.Save, contentDescription = "Save action")
-                    }
-                }
-            )
-        }
+    BaseTaskerConfigScaffold(
+        title = "On entity trigger state",
+        onSave = {
+            val built = viewModel.buildForm()
+            onSave(built)
+        },
+        showTestButton = false
     ) { padding ->
         Column(
             modifier = Modifier
@@ -65,25 +49,34 @@ fun OnTriggerStateScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (viewModel.clientError != "") {
-                Text(viewModel.clientError, color = MaterialTheme.colorScheme.error)
-
+            // Error message
+            if (viewModel.clientError.isNotEmpty()) {
+                Text(
+                    text = viewModel.clientError,
+                    color = MaterialTheme.colorScheme.error
+                )
                 Text("Please check your connection settings in the main app outside of tasker")
             }
-            if(entitySearching)
+
+            // Domain search filter
+            if (entitySearching) {
                 TextField(
                     value = viewModel.currentDomainSearch,
                     onValueChange = { viewModel.currentDomainSearch = it },
-                    label = { Text("filter domain") },
+                    label = { Text("Filter domain") },
+                    modifier = Modifier.fillMaxWidth()
                 )
+            }
 
+            // Entity selector
             EntitySelector(
                 entities = viewModel.entities,
                 serviceDomain = viewModel.currentDomainSearch,
                 currentEntityId = form.entityId,
                 searching = entitySearching,
                 onSearchChanged = { entitySearching = it },
-                onEntitySelected = { viewModel.pickEntity(it) }
+                onEntitySelected = { viewModel.pickEntity(it) },
+                onEntityIdChanged = { viewModel.pickEntity(it) }
             )
 
             if(!entitySearching) {
@@ -98,7 +91,14 @@ fun OnTriggerStateScreen(
                     onValueChange = { viewModel.setTo(it) },
                     label = { Text("To") },
                 )
+                Log.e("TESTTESTTEST", "${form.forDuration}")
+                DurationHmsStringField(
+                    value = form.forDuration,
+                    onValueChange = { viewModel.setFor(it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
 }
+

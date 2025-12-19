@@ -7,7 +7,7 @@ import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
 @TaskerOutputObject
-class OnTriggerStateUpdate @JvmOverloads constructor(
+class OnTriggerStateOutput @JvmOverloads constructor(
 
     @field:TaskerInputField("rawJson")
     @get:TaskerOutputVariable("ha_raw", labelResIdName = "ha_raw_label")
@@ -24,6 +24,11 @@ class OnTriggerStateUpdate @JvmOverloads constructor(
     @field:TaskerInputField("toState")
     @get:TaskerOutputVariable("ha_to", labelResIdName = "ha_on_trigger_to_label")
     var toState: String? = null,
+
+    @field:TaskerInputField("forDuration")
+    @get:TaskerOutputVariable("ha_for", labelResIdName = "ha_on_trigger_for_label")
+    var forDuration: String? = null,
+
 
     @field:TaskerInputField("attributesJson")
     @get:TaskerOutputVariable("ha_attrs", labelResIdName = "ha_on_trigger_attrs_label")

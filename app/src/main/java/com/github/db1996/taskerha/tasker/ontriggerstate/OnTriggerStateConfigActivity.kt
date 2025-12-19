@@ -1,76 +1,53 @@
 package com.github.db1996.taskerha.tasker.ontriggerstate
 
-import android.content.Context
-import android.os.Bundle
-import android.util.Log
-import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
-import com.github.db1996.taskerha.activities.screens.OnTriggerStateScreen
-import com.github.db1996.taskerha.activities.viewmodels.OnTriggerStateViewModel
-import com.github.db1996.taskerha.activities.viewmodels.OnTriggerStateViewModelFactory
-import com.github.db1996.taskerha.client.HomeAssistantClient
-import com.github.db1996.taskerha.datamodels.HaSettings
-import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
-import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
-import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
+import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.tasker.ontriggerstate.screens.OnTriggerStateScreen
+import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
+import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
+import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
+import com.github.db1996.taskerha.tasker.ontriggerstate.view.OnTriggerStateViewModel
+import com.github.db1996.taskerha.tasker.ontriggerstate.view.OnTriggerStateViewModelFactory
 
-class ActivityConfigOnTriggerState :
-    AppCompatActivity(),
-    TaskerPluginConfig<OnTriggerStateInput> {
+class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
+        OnTriggerStateInput,
+        OnTriggerStateOutput,
+    OnTriggerStateForm,
+    OnTriggerStateBuiltForm,
+    OnTriggerStateViewModel
+>() {
 
-    override val context: Context
-        get() = applicationContext
+    override val viewModel: OnTriggerStateViewModel by viewModels { createViewModelFactory() }
 
-    private val client by lazy {
-        val url = HaSettings.loadUrl(this)
-        val token = HaSettings.loadToken(this)
-        HomeAssistantClient(url, token)
+    override fun createViewModelFactory() = OnTriggerStateViewModelFactory(this)
+
+    override fun createHelper() = OnTriggerStateConfigHelper(this)
+
+    override fun createScreen(onSave: (OnTriggerStateBuiltForm) -> Unit): @Composable () -> Unit = {
+        OnTriggerStateScreen(viewModel, onSave)
     }
-    private val viewModel: OnTriggerStateViewModel by viewModels {
-        OnTriggerStateViewModelFactory(client)
-    }
-    private val helper by lazy { OnTriggerStateHelper(this) }
 
-    private var entityId: String = ""
-    private var fromState: String = ""
-    private var toState: String = ""
-
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        helper.onCreate()
-        Log.e("OnTriggerStateConfigActivity", "onCreate for Tasker config")
-
-        viewModel.restoreForm(entityId, fromState, toState)
-        setContent {
-            TaskerHaTheme {
-                OnTriggerStateScreen(viewModel) { entityId, fromState, toState ->
-                    this.entityId = entityId
-                    this.fromState = fromState
-                    this.toState = toState
-                    helper.finishForTasker()
-                }
-            }
+    override fun convertBuiltFormToInput(builtForm: OnTriggerStateBuiltForm): OnTriggerStateInput {
+        return OnTriggerStateInput().apply {
+            entityId = builtForm.entityId
+            fromState = builtForm.fromState
+            toState = builtForm.toState
+            forDuration = builtForm.forDuration
         }
     }
 
-    override fun assignFromInput(input: TaskerInput<OnTriggerStateInput>) {
-        entityId = input.regular.entityId
-        fromState = input.regular.fromState
-        toState = input.regular.toState
-        Log.d("OnTriggerStateConfigActivity", "Restoring data, entityId: $entityId, fromState: $fromState, toState: $toState")
-        viewModel.restoreForm(entityId, fromState, toState)
+    override fun convertInputToBuiltForm(input: OnTriggerStateInput): OnTriggerStateBuiltForm {
+        return OnTriggerStateBuiltForm(
+            entityId = input.entityId,
+            fromState = input.fromState,
+            toState = input.toState,
+            forDuration = input.forDuration,
+            blurb = "Get state: ${input.entityId}"
+        )
     }
 
-    override val inputForTasker: TaskerInput<OnTriggerStateInput>
-        get() {
-            Log.e("OnTriggerStateConfigActivity", "inputForTasker for Tasker config")
-            val haInput = OnTriggerStateInput().apply {
-                entityId = this@ActivityConfigOnTriggerState.entityId
-                fromState = this@ActivityConfigOnTriggerState.fromState
-                toState = this@ActivityConfigOnTriggerState.toState
-            }
-            return TaskerInput(haInput)
-        }
+    override fun validateBeforeSave(builtForm: OnTriggerStateBuiltForm): String? {
+        return null
+    }
 }
+

@@ -1,7 +1,8 @@
 package com.github.db1996.taskerha.tasker.onHaMessage
 
 import android.content.Context
-import com.github.db1996.taskerha.logging.CustomLogger
+import com.github.db1996.taskerha.logging.LogChannel
+import com.github.db1996.taskerha.tasker.base.BaseLogger
 import com.joaomgcd.taskerpluginlibrary.condition.TaskerPluginRunnerConditionEvent
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
@@ -13,7 +14,12 @@ class OnHaMessageRunner :
             OnHaMessageInput,
             OnHaMessageOutput,
             OnHaMessageOutput
-            >() {
+            >(), BaseLogger {
+    override val logTag: String
+        get() = "OnHaMessageRunner"
+
+    override val logChannel: LogChannel
+        get() = LogChannel.WEBSOCKET
 
     override fun getSatisfiedCondition(
         context: Context,
@@ -30,7 +36,7 @@ class OnHaMessageRunner :
             return TaskerPluginResultConditionUnsatisfied()
         }
 
-        CustomLogger.i("HaWebSocketService", "update: type=${type}, message=${message}")
+        logInfo("Valid update: type=${type}, message=${message}")
         return TaskerPluginResultConditionSatisfied(context, update)
     }
 }

@@ -14,4 +14,7 @@ class OnTriggerStateInput {
 
     @field:TaskerInputField("toState")
     var toState: String = ""
+
+    @field:TaskerInputField("forDuration")
+    var forDuration: String = ""
 }

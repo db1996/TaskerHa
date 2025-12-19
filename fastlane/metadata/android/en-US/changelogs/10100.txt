@@ -1,0 +1,23 @@
+NOTE: There is a breaking change with events (websockets). You will have to open and save your events once and it will be fixed
+
+- Websocket changes
+
+The websocket was broken. Random crashes at seemingly random times. Or the notification would disappear. These are now all fixed.
+
+
+- Entity change profile event
+
+The profile event "HA On Trigger State" was kind of completely broken after leaving it running for 6 hours a day. So was the "HA Direct message".
+
+The entity change profile is now much more performant, it no longer listens for any event. But subscribes to the triggers you set yourself. The added benefit is now there's also an option "for". Which you can use the same way you'd use it in a HA automation trigger.
+However this comes with a disadvantage, there is no way for the app to know if/when you remove or even change an existing profile. So any time you change/add a profile a new trigger is added to the list the app subscribes to. In a future update I will add a screen to the main app that allows you to manage these yourself.
+
+
+- Direct message back to HA
+
+You can now send messages back to HA directly in the form of an event. Which you can use to directly trigger automations. Check the readme for more info
+
+
+- Complete refactor
+
+All events and actions are completely refactored, making it much easier for me to add new/improve functionality in the future.

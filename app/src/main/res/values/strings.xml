@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">TaskerHa</string>
+    <string name="app_name">TaskerHA</string>
 
     <string name="ha_raw_label">Raw response (JSON)</string>
 
@@ -11,8 +11,11 @@
     <string name="ha_on_trigger_entity_label">Entity ID</string>
     <string name="ha_on_trigger_from_label">Old state</string>
     <string name="ha_on_trigger_to_label">New state</string>
+    <string name="ha_on_trigger_for_label">Time in HH:MM:SS, time the state needs to be changed for</string>
     <string name="ha_on_trigger_attrs_label">New state attributes (JSON). For example: brightness: 100</string>
 
     <string name="on_ha_message_type_label">Type (optional), can be anything custom</string>
     <string name="on_ha_message_message_label">Message (optional), can be anything custom</string>
+
+    <string name="on_ha_raw_json_label">Raw JSON response of the api call</string>
 </resources>

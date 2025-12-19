@@ -1,6 +1,5 @@
 package com.github.db1996.taskerha.client
 
-import android.util.Log
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaDomainService
 import com.github.db1996.taskerha.datamodels.HaEntity
@@ -9,6 +8,7 @@ import com.github.db1996.taskerha.datamodels.HaServiceField
 import com.github.db1996.taskerha.datamodels.Option
 import com.github.db1996.taskerha.enums.HaServiceFieldType
 import com.github.db1996.taskerha.enums.HomeassistantStatus
+import com.github.db1996.taskerha.tasker.base.BaseLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer
@@ -33,7 +33,10 @@ import java.io.IOException
 class HomeAssistantClient(
     var baseUrl: String = "",
     var accessToken: String = ""
-) {
+): BaseLogger {
+
+    override val logTag: String
+        get() = "HomeAssistantClient"
 
     private val http = OkHttpClient()
     private val json = Json { ignoreUnknownKeys = true }
@@ -78,6 +81,8 @@ class HomeAssistantClient(
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
         try {
             val response = http.newCall(request("/api/")).execute()
+            logVerbose("Ping url ${response.request.url}")
+
             if (!response.isSuccessful) {
                 error =
                     if (response.code == 401) "Unauthorized, check your token" else response.message
@@ -153,9 +158,10 @@ class HomeAssistantClient(
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
 
             val req = request("/api/states/$entityId")
-
+            logVerbose("url: ${req.url}")
             try {
                 val response = http.newCall(req).execute()
+                logVerbose("Response: $response")
                 result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
                     error =
@@ -183,7 +189,7 @@ class HomeAssistantClient(
             if (entityId.isNotEmpty()) payload["entity_id"] = entityId
             data?.let { payload.putAll(it) }
 
-            Log.d("HA client", "Payload: $payload")
+            logVerbose("Payload: $payload")
 
             val body = json.encodeToString(
                 MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
@@ -191,9 +197,48 @@ class HomeAssistantClient(
             )
 
             val req = request("/api/services/$domain/$service", "POST", body)
+            logVerbose("url: ${req.url}")
 
             try {
                 val response = http.newCall(req).execute()
+
+                result = response.body?.string() ?: ""
+                if (!response.isSuccessful) {
+                    error =
+                        if (response.code == 401) "Unauthorized, check your token" else response.message
+                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                    false
+                } else {
+                    homeAssistantStatus = HomeassistantStatus.CONNECTED
+                    true
+                }
+            } catch (e: IOException) {
+                error = e.toString()
+                homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                false
+            }
+        }
+
+    suspend fun fireEvent(eventType: String, data: Map<String, Any>? = null): Boolean =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
+
+            val payload = mutableMapOf<String, Any>()
+            data?.let { payload.putAll(it) }
+
+            logVerbose("Payload: $payload")
+
+
+            val body = json.encodeToString(
+                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
+                payload.mapValues { JsonPrimitive(it.value.toString()) }
+            )
+
+            val req = request("/api/events/$eventType", "POST", body)
+            logVerbose("url: ${req.url}")
+            try {
+                val response = http.newCall(req).execute()
+
                 result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
                     error =

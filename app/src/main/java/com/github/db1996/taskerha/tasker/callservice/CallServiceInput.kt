@@ -6,7 +6,7 @@ import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputObject
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
-class HaCallServiceInput {
+class CallServiceInput {
     @field:TaskerInputField("domain")
     var domain: String = ""
 
@@ -15,16 +15,17 @@ class HaCallServiceInput {
 
     @field:TaskerInputField("entityId")
     var entityId: String = ""
+
     @field:TaskerInputField("dataJson")
     var dataJson: String = "{}"
 }
 
 @TaskerOutputObject
-class HaCallServiceOutput(
-
+class CallServiceOutput(
     @get:TaskerOutputVariable(
         name = "ha_data",
         labelResIdName = "ha_call_service_data_label"
     )
     val dataJson: String
 )
+

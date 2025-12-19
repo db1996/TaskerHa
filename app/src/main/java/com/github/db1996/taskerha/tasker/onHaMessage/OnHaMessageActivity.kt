@@ -1,64 +1,49 @@
 package com.github.db1996.taskerha.tasker.onHaMessage
 
-import android.content.Context
-import android.os.Bundle
-import android.util.Log
-import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
+import com.github.db1996.taskerha.tasker.onHaMessage.data.OnHaMessageBuiltForm
+import com.github.db1996.taskerha.tasker.onHaMessage.data.OnHaMessageForm
+import com.github.db1996.taskerha.tasker.onHaMessage.screens.OnHaMessageScreen
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModel
 import com.github.db1996.taskerha.tasker.onHaMessage.view.OnHaMessageViewModelFactory
-import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
-import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
-import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 
-class OnHaMessageActivity :
-    AppCompatActivity(),
-    TaskerPluginConfig<OnHaMessageInput> {
+class OnHaMessageActivity : BaseTaskerConfigActivity<
+        OnHaMessageInput,
+        OnHaMessageOutput,
+    OnHaMessageForm,
+    OnHaMessageBuiltForm,
+    OnHaMessageViewModel
+>() {
 
-    override val context: Context
-        get() = applicationContext
+    override val viewModel: OnHaMessageViewModel by viewModels { createViewModelFactory() }
 
-    private val viewModel: OnHaMessageViewModel by viewModels {
-        OnHaMessageViewModelFactory()
+    override fun createViewModelFactory() = OnHaMessageViewModelFactory(this)
+
+    override fun createHelper() = OnHaMessageHelper(this)
+
+    override fun createScreen(onSave: (OnHaMessageBuiltForm) -> Unit): @Composable () -> Unit = {
+        OnHaMessageScreen (viewModel, onSave)
     }
-    private val helper by lazy { OnHaMessageHelper(this) }
 
-    private var type: String = ""
-    private var message: String = ""
-
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        helper.onCreate()
-        Log.e("OnHaMessageActivity", "onCreate for Tasker config")
-
-        viewModel.restoreForm(type, message)
-        setContent {
-            TaskerHaTheme {
-                OnHaMessageScreen(viewModel) { type, message ->
-                    this.type = type
-                    this.message = message
-                    helper.finishForTasker()
-                }
-            }
+    override fun convertBuiltFormToInput(builtForm: OnHaMessageBuiltForm): OnHaMessageInput {
+        return OnHaMessageInput().apply {
+            type = builtForm.type
+            message = builtForm.message
         }
     }
 
-    override fun assignFromInput(input: TaskerInput<OnHaMessageInput>) {
-        type = input.regular.type
-        message = input.regular.message
-        Log.d("OnHaMessageActivity", "Restoring data, type: $type, message: $message")
-        viewModel.restoreForm(type, message)
+    override fun convertInputToBuiltForm(input: OnHaMessageInput): OnHaMessageBuiltForm {
+        return OnHaMessageBuiltForm(
+            type = input.type,
+            message = input.message,
+            blurb = "Get state: ${input.type}"
+        )
     }
 
-    override val inputForTasker: TaskerInput<OnHaMessageInput>
-        get() {
-            Log.e("OnHaMessageActivity", "inputForTasker for Tasker config")
-            val haInput = OnHaMessageInput().apply {
-                type = this@OnHaMessageActivity.type
-                message = this@OnHaMessageActivity.message
-            }
-            return TaskerInput(haInput)
-        }
+    override fun validateBeforeSave(builtForm: OnHaMessageBuiltForm): String? {
+        return null
+    }
 }
+

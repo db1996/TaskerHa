@@ -1,15 +1,16 @@
 package com.github.db1996.taskerha.tasker.onHaMessage.view
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import android.content.Context
+import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.tasker.base.ClientViewModelFactory
 
 class OnHaMessageViewModelFactory(
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(OnHaMessageViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return OnHaMessageViewModel() as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
+    context: Context
+) : ClientViewModelFactory<OnHaMessageViewModel>(context) {
+
+    override val viewModelClass = OnHaMessageViewModel::class.java
+
+    override fun createViewModel(client: HomeAssistantClient): OnHaMessageViewModel {
+        return OnHaMessageViewModel(client)
     }
 }

@@ -1,73 +1,49 @@
-package com.github.db1996.taskerha.activities.screens
+package com.github.db1996.taskerha.tasker.callservice.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.github.db1996.taskerha.activities.composables.FieldInput
-import com.github.db1996.taskerha.activities.partials.ServiceSelector
 import com.github.db1996.taskerha.activities.partials.EntitySelector
-import com.github.db1996.taskerha.activities.viewmodels.HaCallServiceViewModel
+import com.github.db1996.taskerha.activities.partials.ServiceSelector
+import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
+import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
+import com.github.db1996.taskerha.tasker.callservice.view.CallServiceViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HaCallServiceScreen(
-    viewModel: HaCallServiceViewModel,
-    onSave: (domain: String, service: String, entityId: String, data: Map<String, String>) -> Unit
+fun CallServiceScreen(
+    viewModel: CallServiceViewModel,
+    onSave: (CallServiceFormBuiltForm) -> Unit
 ) {
     var entitySearching by remember { mutableStateOf(false) }
 
-    // Load on first composition
+    // Load entities on first composition
     LaunchedEffect(Unit) {
-        viewModel.loadServices()
         viewModel.loadEntities()
+        viewModel.loadServices()
     }
 
-    val selectedService = viewModel.selectedService
     val form = viewModel.form
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Configure Action") },
-                actions = {
-                    IconButton(onClick = {
-                        viewModel.testForm()
-                    }) {
-                        Icon(Icons.Rounded.PlayArrow, contentDescription = "Test action")
-                    }
-                    FilledIconButton(
-                        onClick = {
-                            val built = viewModel.buildForm()
-                            onSave(built.domain, built.service, built.entityId, built.data)
-                        }
-                    ) {
-                        Icon(Icons.Rounded.Save, contentDescription = "Save action")
-                    }
-                }
-            )
-        }
+    BaseTaskerConfigScaffold(
+        title = "Call HA service",
+        onSave = {
+            val built = viewModel.buildForm()
+            onSave(built)
+        },
+        onTest = { viewModel.testForm() },
+        showTestButton = true
     ) { padding ->
         Column(
             modifier = Modifier
@@ -85,7 +61,7 @@ fun HaCallServiceScreen(
                 Text("Reset domain/service")
             }
             // --- If no service selected → show selector
-            if (selectedService == null && viewModel.services.isNotEmpty()) {
+            if (viewModel.selectedService == null && viewModel.services.isNotEmpty()) {
                 ServiceSelector(
                     services = viewModel.services,
                     onSelect = { service -> viewModel.pickService(service) },
@@ -97,7 +73,7 @@ fun HaCallServiceScreen(
             }
 
             // --- If a service is selected → show details
-            selectedService?.let { service ->
+            viewModel.selectedService?.let { service ->
                 Text("Domain: ${service.domain}", style = MaterialTheme.typography.labelMedium)
                 Text("Service: ${service.id}", style = MaterialTheme.typography.labelMedium)
 
@@ -108,7 +84,8 @@ fun HaCallServiceScreen(
                         currentEntityId = form.entityId,
                         searching = entitySearching,
                         onSearchChanged = { entitySearching = it },
-                        onEntitySelected = { viewModel.pickEntity(it) }
+                        onEntitySelected = { viewModel.pickEntity(it) },
+                        onEntityIdChanged = { viewModel.pickEntity(it) }
                     )
                 }
 
@@ -129,3 +106,4 @@ fun HaCallServiceScreen(
         }
     }
 }
+

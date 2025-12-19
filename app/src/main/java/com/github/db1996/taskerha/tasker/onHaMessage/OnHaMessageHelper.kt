@@ -13,7 +13,7 @@ class OnHaMessageHelper(
     override val inputClass = OnHaMessageInput::class.java
     override val outputClass = OnHaMessageOutput::class.java
 }
-fun Context.triggerOnHaMessageHelper(type: String?, message: String?) {
+fun Context.triggerOnHaMessageHelper2(type: String?, message: String?) {
     OnHaMessageActivity::class.java.requestQuery(
         this,
         OnHaMessageOutput(
