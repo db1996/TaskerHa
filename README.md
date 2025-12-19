@@ -9,7 +9,7 @@ TaskerHA lets you:
 - Call any Home Assistant service from a Tasker action
 - Read the state and attributes of any entity
 - Trigger Tasker profiles when an entity changes state over a websocket connection
-- Send direct messages from HA to tasker with a custom event (uses websocket)
+- Send direct messages from HA to tasker and back with a custom event (uses websocket)
 
 
 Table of contents:
@@ -119,9 +119,9 @@ The following variables are available from within tasker after the action
 | Error code | Description                                                                                                                                                                        |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1          | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
-| 2          | Service call failed. This means that it can connect correctly with Homeassistant but the service call itself failed. %errmsg will contain more details                             |
-| 3          | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
-| 4          | Invalid JSON Data, this means the app failed to map your data to a valid JSON format. This is about the optional options for service calls                                         |
+| 2          | Invalid input. This means domain or service cannot be empty                                                                                                                        |
+| 3          | Service call failed. This means that it can connect correctly with Homeassistant but the service call itself failed. %errmsg will contain more details                             |
+| 9999       | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
 
 
 ### Get State action
@@ -159,8 +159,58 @@ The following variables are available from within tasker after the action
 | Error code | Description                                                                                                                                                                        |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1          | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
-| 2          | Get entity state call failed. This means that it can connect correctly with Homeassistant but the entity state call itself failed. %errmsg will contain more details               |
-| 3          | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
+| 2          | Invalid input. This means entity ID cannot be empty                                                                                                                                |
+| 3          | Get entity state call failed. This means that it can connect correctly with Homeassistant but the entity state call itself failed. %errmsg will contain more details               |
+| 9999       | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
+
+### Direct message to HA action
+
+1. Create a new task in tasker
+2. Add action -> plugin -> taskerHa -> HA send message back
+
+You can use tasker variables for the type and message.
+
+**Example**
+
+Activate an automation in Homeassistant
+
+In Tasker:
+
+- action -> plugin -> taskerHa -> HA send message back
+- Set type to "this_automation"
+- Set message to "some_message"
+
+In Homeassistant:
+
+- Automations -> new automation -> add trigger -> Manual event -> Edit as yaml and paste:
+
+``` yaml
+trigger: event
+event_type: taskerha_message_back
+event_data:
+  type: this_automation # Optional, acts as a filter
+  message: some_message # Optional, acts as a filter
+```
+
+#### Response in tasker
+
+The following variables are available from within tasker after the action
+
+| Variable | Function                                                                                                                                                                                                   |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_type | Contains the type sent in the event                                                                                                                                                                        |
+| %ha_message | Contains the message sent in the event                                                                                                                                                                  |
+| %rawJson | Contains the raw JSON response from the event                                                                                                                                                              |
+| %err     | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
+| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
+
+#### Error codes
+
+| Error code | Description                                                                                                                                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1          | Can't connect to Home Assistant. This means the app could not ping HA. The error will contain more details depending on the reason. But usually this means it can't reach the host |
+| 9999       | Unknown error occured. %errmsg will contain more details (java error)                                                                                                              |
+
 
 ### Direct message from ha profile
 
@@ -201,8 +251,8 @@ The following variables are available from within tasker after the action
 
 | Variable | Function                                                                                                                                                                                                   |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| %ha_type | Contains the type sent in the event, if                                                                                                                                                                    |
-| %ha_from | Contains the old state of the choosen entity. Example `off`                                                                                                                                                |  |
+| %ha_type | Contains the type sent in the event                                                                                                                                                                        |
+| %ha_message | Contains the message sent in the event                                                                                                                                                                  |
 | %err     | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
 | %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
 
@@ -210,7 +260,7 @@ The following variables are available from within tasker after the action
 
 | Error code | Description                                                           |
 | ---------- | --------------------------------------------------------------------- |
-| 3          | Unknown error occured. %errmsg will contain more details (java error) |
+| 9999       | Unknown error occured. %errmsg will contain more details (java error) |
 
 ### Trigger state change profile
 
@@ -241,10 +291,11 @@ The following variables are available from within tasker after the action
 
 | Variable   | Function                                                                                                                                                                                                   |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| %ha_to     | Contains the current state of the choosen entity. Example `on`                                                                                                                                             |
-| %ha_from   | Contains the old state of the choosen entity. Example `off`                                                                                                                                                |
-| %ha_attrs  | Contains in JSON any attributes on the entity for the new state. For example, for lights you will get the color, brightness etc.                                                                           |
 | %ha_entity | Contains the entity_id of the choosen entity                                                                                                                                                               |
+| %ha_from   | Contains the old state of the choosen entity. Example `off`                                                                                                                                                |
+| %ha_to     | Contains the current state of the choosen entity. Example `on`                                                                                                                                             |
+| %ha_for    | Contains the duration the entity was in the state (format: hours:minutes:seconds)                                                                                                                          |
+| %ha_attrs  | Contains in JSON any attributes on the entity for the new state. For example, for lights you will get the color, brightness etc.                                                                           |
 | %ha_raw    | Raw JSON of the full entity state change response from homeassistant.                                                                                                                                      |
 | %err       | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
 | %errmsg    | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
@@ -253,4 +304,4 @@ The following variables are available from within tasker after the action
 
 | Error code | Description                                                           |
 | ---------- | --------------------------------------------------------------------- |
-| 3          | Unknown error occured. %errmsg will contain more details (java error) |
+| 9999       | Unknown error occured. %errmsg will contain more details (java error) |
