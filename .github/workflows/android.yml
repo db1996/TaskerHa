@@ -25,7 +25,6 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # Keep builds deterministic/clean
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
@@ -38,15 +37,32 @@ jobs:
           chmod +x ./gradlew
           ./gradlew --no-daemon --stacktrace --no-build-cache clean :app:assembleRelease
 
-      - name: Prepare signing tools (build-tools) in PATH
+      - name: Ensure zipalign/apksigner are available
         run: |
-          # Add newest installed build-tools to PATH so zipalign/apksigner are available
-          BT_DIR="$(ls -1 "${ANDROID_SDK_ROOT}/build-tools" | sort -V | tail -n 1)"
-          echo "${ANDROID_SDK_ROOT}/build-tools/${BT_DIR}" >> "$GITHUB_PATH"
+          set -e
+
+          # Pick newest build-tools dir if present
+          if [ -d "${ANDROID_SDK_ROOT}/build-tools" ] && [ "$(ls -A "${ANDROID_SDK_ROOT}/build-tools")" ]; then
+            BT_DIR="$(ls -1 "${ANDROID_SDK_ROOT}/build-tools" | sort -V | tail -n 1)"
+          else
+            BT_DIR=""
+          fi
+
+          # If none found, install a known version (adjust if you want)
+          if [ -z "$BT_DIR" ]; then
+            echo "No build-tools found; installing 36.1.0..."
+            yes | sdkmanager "build-tools;36.1.0"
+            BT_DIR="36.1.0"
+          fi
+
           echo "Using build-tools: ${BT_DIR}"
 
-          which zipalign
-          which apksigner
+          # IMPORTANT: export PATH for THIS step + persist for NEXT steps
+          export PATH="${ANDROID_SDK_ROOT}/build-tools/${BT_DIR}:$PATH"
+          echo "${ANDROID_SDK_ROOT}/build-tools/${BT_DIR}" >> "$GITHUB_PATH"
+
+          command -v zipalign
+          command -v apksigner
 
       - name: Decode keystore from secrets
         run: |
@@ -61,9 +77,7 @@ jobs:
         run: |
           set -e
 
-          # Default unsigned APK output from assembleRelease (no signingConfig in Gradle)
           UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
-
           if [ ! -f "$UNSIGNED_APK" ]; then
             echo "Expected unsigned APK not found at: $UNSIGNED_APK"
             echo "Searching for an unsigned release APK..."
@@ -78,11 +92,9 @@ jobs:
 
           mkdir -p dist
 
-          # zipalign is required/best practice before signing
           ALIGNED_APK="dist/aligned.apk"
           zipalign -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
 
-          # Sign (v2+ is fine for minSdk 24; apksigner defaults are OK)
           SIGNED_APK="dist/signed.apk"
           apksigner sign \
             --ks keystore.jks \
@@ -92,7 +104,6 @@ jobs:
             --out "$SIGNED_APK" \
             "$ALIGNED_APK"
 
-          # Verify signature
           apksigner verify --verbose "$SIGNED_APK"
 
       - name: Rename signed APK to TaskerHa.<tag>.apk
