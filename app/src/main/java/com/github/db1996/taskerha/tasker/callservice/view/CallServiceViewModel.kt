@@ -132,8 +132,9 @@ class CallServiceViewModel(
         }
 
         logError("Restoring form: ${data}")
-        form.dataContainer.clear()
+        logInfo("Restoring form: ${data.domain}, ${data.service}, ${data.entityId},")
 
+        val restoredDataContainer = mutableMapOf<String, FieldState>()
         pservice.fields.forEach { field ->
             val state = FieldState()
             if (data.data.containsKey(field.id)) {
@@ -143,7 +144,7 @@ class CallServiceViewModel(
             if(field.required == true){
                 state.toggle.value = true
             }
-            form.dataContainer[field.id] = state
+            restoredDataContainer[field.id] = state
         }
         logDebug("Restoring form: ${data.domain}, ${data.service}, ${data.entityId},")
         selectedService = pservice
@@ -152,6 +153,7 @@ class CallServiceViewModel(
             entityId = data.entityId,
             domain = data.domain,
             service = data.service,
+            dataContainer = restoredDataContainer,
         )
     }
 
