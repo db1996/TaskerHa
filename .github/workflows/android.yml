@@ -35,20 +35,18 @@ jobs:
           GRADLE_USER_HOME: ${{ github.workspace }}/.gradle-user-home
         run: |
           chmod +x ./gradlew
-          ./gradlew --no-daemon --stacktrace --no-build-cache clean :app:assembleRelease
+          ./gradlew --no-daemon --stacktrace --no-build-cache clean assembleRelease
 
-      - name: Ensure zipalign/apksigner are available
+      - name: Ensure apksigner is available
         run: |
           set -e
 
-          # Pick newest build-tools dir if present
           if [ -d "${ANDROID_SDK_ROOT}/build-tools" ] && [ "$(ls -A "${ANDROID_SDK_ROOT}/build-tools")" ]; then
             BT_DIR="$(ls -1 "${ANDROID_SDK_ROOT}/build-tools" | sort -V | tail -n 1)"
           else
             BT_DIR=""
           fi
 
-          # If none found, install a known version (adjust if you want)
           if [ -z "$BT_DIR" ]; then
             echo "No build-tools found; installing 36.1.0..."
             yes | sdkmanager "build-tools;36.1.0"
@@ -57,11 +55,9 @@ jobs:
 
           echo "Using build-tools: ${BT_DIR}"
 
-          # IMPORTANT: export PATH for THIS step + persist for NEXT steps
           export PATH="${ANDROID_SDK_ROOT}/build-tools/${BT_DIR}:$PATH"
           echo "${ANDROID_SDK_ROOT}/build-tools/${BT_DIR}" >> "$GITHUB_PATH"
 
-          command -v zipalign
           command -v apksigner
 
       - name: Decode keystore from secrets
@@ -78,6 +74,7 @@ jobs:
           set -e
 
           UNSIGNED_APK="app/build/outputs/apk/release/app-release-unsigned.apk"
+
           if [ ! -f "$UNSIGNED_APK" ]; then
             echo "Expected unsigned APK not found at: $UNSIGNED_APK"
             echo "Searching for an unsigned release APK..."
@@ -92,29 +89,34 @@ jobs:
 
           mkdir -p dist
 
-          ALIGNED_APK="dist/aligned.apk"
-          zipalign -f -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
-
           SIGNED_APK="dist/signed.apk"
+
           apksigner sign \
             --ks keystore.jks \
             --ks-pass env:KS_PASS \
             --ks-key-alias "$KEY_ALIAS" \
             --key-pass env:KEY_PASS \
             --out "$SIGNED_APK" \
-            "$ALIGNED_APK"
+            "$UNSIGNED_APK"
 
           apksigner verify --verbose "$SIGNED_APK"
 
-      - name: Rename signed APK to TaskerHa.<tag>.apk
+          cp "$UNSIGNED_APK" dist/unsigned.apk
+
+      - name: Rename APKs
         run: |
           TAG="${{ github.ref_name }}"
-          mv "dist/signed.apk" "dist/TaskerHa.${TAG}.apk"
+
+          mv dist/signed.apk "dist/TaskerHa.${TAG}.apk"
+          mv dist/unsigned.apk "dist/TaskerHa.${TAG}.unsigned.apk"
+
           ls -la dist
 
-      - name: Create/Update GitHub Release and upload APK
+      - name: Create/Update GitHub Release and upload APKs
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: dist/TaskerHa.${{ github.ref_name }}.apk
+          files: |
+            dist/TaskerHa.${{ github.ref_name }}.apk
+            dist/TaskerHa.${{ github.ref_name }}.unsigned.apk
           generate_release_notes: true
