@@ -1,0 +1,2 @@
+- Fixed pyscript issues with calling a service
+- Fixed issue with some fields not always showing while editing a "Call Service" task from tasker.
