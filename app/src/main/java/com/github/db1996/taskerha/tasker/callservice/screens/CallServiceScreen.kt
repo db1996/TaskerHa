@@ -78,6 +78,17 @@ fun CallServiceScreen(
                 Text("Service: ${service.id}", style = MaterialTheme.typography.labelMedium)
 
                 if (service.targetEntity) {
+                    if (form.entityId.isNotBlank()) {
+                        val displayEntity =
+                            if (form.entityId.startsWith("${service.domain}.", ignoreCase = true))
+                                form.entityId.substringAfter('.')
+                            else
+                                form.entityId
+                        Text(
+                            "Entity: $displayEntity",
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
                     EntitySelector(
                         entities = viewModel.entities,
                         serviceDomain = service.domain,
