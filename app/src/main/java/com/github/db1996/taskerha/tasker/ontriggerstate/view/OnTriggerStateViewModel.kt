@@ -10,6 +10,7 @@ import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
+import java.util.UUID
 
 class OnTriggerStateViewModel(
     client: HomeAssistantClient
@@ -76,7 +77,8 @@ class OnTriggerStateViewModel(
             fromState = form.fromState,
             toState = form.toState,
             blurb = blurb,
-            forDuration = form.forDuration
+            forDuration = form.forDuration,
+            triggerId = UUID.randomUUID().toString()
         )
     }
 

@@ -157,6 +157,7 @@ abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM :
         }
 
         if (builtForm is SavePrefsJson) {
+            (currentBuiltForm as? SavePrefsJson)?.let { PrefsJsonStore.remove(it.prefsName(), it.jsonValue()) }
             PrefsJsonStore.add(builtForm)
         }
 

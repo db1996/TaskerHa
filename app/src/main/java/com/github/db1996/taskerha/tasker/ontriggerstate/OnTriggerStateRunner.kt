@@ -47,6 +47,19 @@ class OnTriggerStateRunner :
         val eventFor = wsForToDurationString(envelope.for_)
         update.forDuration = eventFor
 
+        // UUID fast-path: when both sides have a triggerId, only ID equality matters.
+        // HA already applied entity/state/for filters when it fired the trigger.
+        val eventTriggerId = update.triggerId
+        val configTriggerId = config.triggerId.takeIf { it.isNotBlank() }
+        if (eventTriggerId != null && configTriggerId != null) {
+            return if (eventTriggerId == configTriggerId) {
+                CustomLogger.i("OnTriggerStateRunner", "UUID match fired: entity=${update.entityId}, triggerId=$configTriggerId")
+                TaskerPluginResultConditionSatisfied(context, update)
+            } else {
+                TaskerPluginResultConditionUnsatisfied()
+            }
+        }
+
         fun matches(configVal: String, eventVal: String?): Boolean {
             if (configVal.isBlank()) return true
             if (eventVal == null) return false

@@ -35,6 +35,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
             fromState = builtForm.fromState
             toState = builtForm.toState
             forDuration = builtForm.forDuration
+            triggerId = builtForm.triggerId ?: ""
         }
     }
 
@@ -49,6 +50,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
             fromState = input.fromState,
             toState = input.toState,
             forDuration = input.forDuration,
+            triggerId = input.triggerId.takeIf { it.isNotBlank() },
             blurb = if (parsedEntityIds.isNotEmpty()) {
                 "Get state: ${parsedEntityIds.joinToString(", ")}"
             } else if (input.entityId.isNotBlank()) {

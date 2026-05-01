@@ -27,7 +27,8 @@ data class OnTriggerStateBuiltForm(
     val blurb: String = "",
     val fromState: String = "",
     val toState: String = "",
-    val forDuration: String = ""
+    val forDuration: String = "",
+    val triggerId: String? = null
 ) : SavePrefsJson {
     override fun prefsName(): String = "TriggerStatePrefs"
 

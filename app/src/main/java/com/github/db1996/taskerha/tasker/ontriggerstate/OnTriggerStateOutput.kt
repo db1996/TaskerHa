@@ -36,5 +36,8 @@ class OnTriggerStateOutput @JvmOverloads constructor(
 
     @field:TaskerInputField("entityIds")
     @get:TaskerOutputVariable("ha_entities", labelResIdName = "ha_on_trigger_entities_label")
-    var entityIds: String? = null
+    var entityIds: String? = null,
+
+    @field:TaskerInputField("triggerId")
+    var triggerId: String? = null
 )
