@@ -42,8 +42,14 @@ class OnTriggerStateViewModel(
         }
     }
 
-    fun removeEntity(entityId: String) {
-        form = form.copy(entityIds = form.entityIds - entityId)
+    fun removeEntity(index: Int) {
+        form = form.copy(entityIds = form.entityIds.toMutableList().also { it.removeAt(index) })
+    }
+
+    fun updateEntityAt(index: Int, value: String) {
+        val updated = form.entityIds.toMutableList()
+        updated[index] = value
+        form = form.copy(entityIds = updated)
     }
 
     fun setFrom(fromState: String) {

@@ -2,8 +2,7 @@ package com.github.db1996.taskerha.tasker.ontriggerstate.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -11,9 +10,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
@@ -29,7 +29,6 @@ import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.view.OnTriggerStateViewModel
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OnTriggerStateScreen(
     viewModel: OnTriggerStateViewModel,
@@ -89,25 +88,24 @@ fun OnTriggerStateScreen(
                     onEntityIdChanged = {}
                 )
             } else {
-                // Chips showing the currently selected entities
-                if (form.entityIds.isNotEmpty()) {
-                    FlowRow(
+                // Editable text field per entity, with a delete button
+                form.entityIds.forEachIndexed { index, entityId ->
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        form.entityIds.forEach { entityId ->
-                            InputChip(
-                                selected = false,
-                                onClick = {},
-                                label = { Text(entityId) },
-                                trailingIcon = {
-                                    IconButton(onClick = { viewModel.removeEntity(entityId) }) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Close,
-                                            contentDescription = "Remove $entityId"
-                                        )
-                                    }
-                                }
+                        OutlinedTextField(
+                            value = entityId,
+                            onValueChange = { viewModel.updateEntityAt(index, it) },
+                            label = { Text("Entity ID") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
+                        )
+                        IconButton(onClick = { viewModel.removeEntity(index) }) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Remove entity"
                             )
                         }
                     }
@@ -150,5 +148,3 @@ fun OnTriggerStateScreen(
         }
     }
 }
-
-
