@@ -14,3 +14,5 @@
 .cxx
 local.properties
 .kotlin/errors
+debug.keystore
+keyinfo.txt

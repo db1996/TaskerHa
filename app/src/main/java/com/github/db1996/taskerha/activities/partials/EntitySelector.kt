@@ -20,7 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -38,7 +38,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.datamodels.HaEntity
 import com.github.db1996.taskerha.util.EntityRecents
@@ -128,7 +127,9 @@ fun EntitySelector(
             }
 
             if (!searching) {
-                Button(onClick = { onSearchChanged(true) }) { Text("Search") }
+                IconButton(onClick = { onSearchChanged(true) }) {
+                    Icon(Icons.Default.Search, contentDescription = "Search")
+                }
             } else {
                 IconButton(
                     onClick = {
@@ -166,6 +167,7 @@ fun EntitySelector(
                     items(recentEntities, key = { it.entity_id + "_recent" }) { entity ->
                         EntityRowCard(
                             entityId = entity.entity_id,
+                            stripDomain = serviceDomainLower,
                             isRecent = true,
                             onClick = { select(entity.entity_id) },
                             showRemoveRecent = true,
@@ -187,6 +189,7 @@ fun EntitySelector(
                 items(filteredEntities, key = { it.entity_id + "_all" }) { entity ->
                     EntityRowCard(
                         entityId = entity.entity_id,
+                        stripDomain = serviceDomainLower,
                         isRecent = recentSet.contains(entity.entity_id),
                         onClick = { select(entity.entity_id) },
                         showRemoveRecent = true,
@@ -216,10 +219,16 @@ private fun EntityRowCard(
     isRecent: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    stripDomain: String = "",
     showRemoveRecent: Boolean = false,
     onRemoveRecent: (() -> Unit)? = null
 ) {
-    val domain = remember(entityId) { entityId.substringBefore('.', missingDelimiterValue = entityId) }
+    val displayId = remember(entityId, stripDomain) {
+        if (stripDomain.isNotEmpty() && entityId.startsWith("$stripDomain.", ignoreCase = true))
+            entityId.substringAfter('.')
+        else
+            entityId
+    }
 
     Card(
         onClick = onClick,
@@ -237,25 +246,11 @@ private fun EntityRowCard(
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = entityId,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Text(
-                    text = "Domain: $domain",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Text(
+                text = displayId,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f)
+            )
 
             Spacer(Modifier.width(10.dp))
 

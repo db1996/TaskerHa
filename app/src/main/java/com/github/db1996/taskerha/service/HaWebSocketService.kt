@@ -32,6 +32,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import com.github.db1996.taskerha.util.HaHttpClientFactory
+import com.github.db1996.taskerha.util.NetworkHelper
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -78,12 +80,12 @@ class HaWebSocketService : Service(), BaseLogger {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + coroutineExceptionHandler)
 
     private var webSocket: WebSocket? = null
+    private var wifiRegistration: NetworkHelper.ChangeListenerRegistration? = null
+    private var lastResolvedUrl: String? = null
 
     private val httpClient: OkHttpClient by lazy {
         Logger.getLogger(OkHttpClient::class.java.getName()).setLevel(Level.FINE)
-        OkHttpClient.Builder()
-            .pingInterval(30, TimeUnit.SECONDS)
-            .build()
+        HaHttpClientFactory.build(this) { it.pingInterval(30, TimeUnit.SECONDS) }
     }
 
     // === Reconnect state ===
@@ -108,6 +110,15 @@ class HaWebSocketService : Service(), BaseLogger {
             logInfo("Starting websocket service from onStartCommand")
             runCatching { connectWebSocket() }
                 .onFailure { t -> logError("connectWebSocket failed from onStartCommand", t) }
+        }
+
+        // Monitor WiFi changes to reconnect with the correct URL when switching networks.
+        // NetworkHelper has its own long-lived monitoring; we just listen for changes.
+        if (wifiRegistration == null && HaSettings.loadLocalUrlEnabled(this)) {
+            NetworkHelper.startMonitoring(this)
+            wifiRegistration = NetworkHelper.addChangeListener {
+                onWifiChanged()
+            }
         }
 
         return START_STICKY
@@ -149,6 +160,8 @@ class HaWebSocketService : Service(), BaseLogger {
     override fun onDestroy() {
         super.onDestroy()
         isShuttingDown = true
+        wifiRegistration?.unregister()
+        wifiRegistration = null
         reconnectJob?.cancel()
         serviceScope.cancel()
 
@@ -185,7 +198,7 @@ class HaWebSocketService : Service(), BaseLogger {
     }
 
     private fun connectWebSocket() {
-        val url = HaSettings.loadUrl(this)
+        val url = HaSettings.resolveUrl(this)
         val token = HaSettings.loadToken(this)
 
         if (url.isBlank() || token.isBlank()) {
@@ -194,6 +207,7 @@ class HaWebSocketService : Service(), BaseLogger {
             return
         }
 
+        lastResolvedUrl = url
         updateNotification("Connecting to Home Assistant...")
 
         val wsUrl = url
@@ -354,6 +368,32 @@ class HaWebSocketService : Service(), BaseLogger {
                 }
             }
         })
+    }
+
+    /**
+     * Called when WiFi connectivity changes. If the resolved URL has changed
+     * (e.g. switched from home to remote or vice versa), force a reconnect.
+     */
+    private fun onWifiChanged() {
+        if (isShuttingDown) return
+
+        val newUrl = HaSettings.resolveUrl(this)
+        if (newUrl == lastResolvedUrl) return
+
+        logInfo("WiFi changed, URL switched from $lastResolvedUrl to $newUrl — reconnecting")
+        reconnectAttempts = 0
+        reconnectJob?.cancel()
+
+        try {
+            webSocket?.close(1000, "Network changed")
+        } catch (_: Throwable) {}
+        webSocket = null
+
+        serviceScope.launch {
+            delay(500) // small delay to let network settle
+            runCatching { connectWebSocket() }
+                .onFailure { t -> logError("connectWebSocket failed after WiFi change", t) }
+        }
     }
 
     private fun scheduleReconnect(reason: String? = null) {

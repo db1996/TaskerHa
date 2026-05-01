@@ -1,21 +1,32 @@
 package com.github.db1996.taskerha.activities.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
+import android.security.KeyChain
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -28,6 +39,8 @@ import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.logging.LogLevel
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
+import com.github.db1996.taskerha.util.HaHttpClientFactory
+import com.github.db1996.taskerha.util.NetworkHelper
 import com.github.db1996.taskerha.util.hasNotificationPermission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -56,13 +69,34 @@ fun MainSettingsScreen(
     var url by remember { mutableStateOf(HaSettings.loadUrl(context)) }
     var token by remember { mutableStateOf(HaSettings.loadToken(context)) }
 
+    // --- Local URL state
+    var localUrlEnabled by remember { mutableStateOf(HaSettings.loadLocalUrlEnabled(context)) }
+    var localUrl by remember { mutableStateOf(HaSettings.loadLocalUrl(context)) }
+    var homeSsids by remember { mutableStateOf(HaSettings.loadHomeSsids(context)) }
+
+    // --- Client certificate state
+    var clientCertEnabled by remember { mutableStateOf(HaSettings.loadClientCertEnabled(context)) }
+    var clientCertAlias by remember { mutableStateOf(HaSettings.loadClientCertAlias(context)) }
+
+    // Single test status — shows which target was last tested.
     var status by remember { mutableStateOf(Status.Idle) }
     var error by remember { mutableStateOf<String?>(null) }
-    var testing by remember { mutableStateOf(false) }
+    var lastTestedLabel by remember { mutableStateOf<String?>(null) }
+    var testingLabel by remember { mutableStateOf<String?>(null) }
     var saved by remember { mutableStateOf(false) }
 
-    val unsavedChanges by remember(url, token) {
-        mutableStateOf(url != HaSettings.loadUrl(context) || token != HaSettings.loadToken(context))
+    val unsavedChanges by remember(
+        url, token, localUrlEnabled, localUrl, homeSsids, clientCertEnabled, clientCertAlias
+    ) {
+        mutableStateOf(
+            url != HaSettings.loadUrl(context) ||
+            token != HaSettings.loadToken(context) ||
+            localUrlEnabled != HaSettings.loadLocalUrlEnabled(context) ||
+            localUrl != HaSettings.loadLocalUrl(context) ||
+            homeSsids != HaSettings.loadHomeSsids(context) ||
+            clientCertEnabled != HaSettings.loadClientCertEnabled(context) ||
+            clientCertAlias != HaSettings.loadClientCertAlias(context)
+        )
     }
 
     fun setSaved() {
@@ -104,6 +138,8 @@ fun MainSettingsScreen(
     var generalLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.GENERAL)) }
     var wsLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.WEBSOCKET)) }
 
+    val testing = testingLabel != null
+
     // Top bar depends on selected tab
     LaunchedEffect(selectedTab, unsavedChanges, testing, saved, url, token) {
         setTopBar {
@@ -115,6 +151,11 @@ fun MainSettingsScreen(
                             enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
                             onClick = {
                                 HaSettings.save(context, url.trim(), token.trim())
+                                HaSettings.saveLocalUrlEnabled(context, localUrlEnabled)
+                                HaSettings.saveLocalUrl(context, localUrl.trim())
+                                HaSettings.saveHomeSsids(context, homeSsids)
+                                HaSettings.saveClientCertEnabled(context, clientCertEnabled)
+                                HaSettings.saveClientCertAlias(context, clientCertAlias)
                                 setSaved()
                             }
                         ) {
@@ -127,6 +168,33 @@ fun MainSettingsScreen(
                     }
                 }
             )
+        }
+    }
+
+    fun runTest(label: String, targetUrl: String) {
+        testingLabel = label
+        status = Status.Testing
+        lastTestedLabel = label
+        // Build a one-shot OkHttpClient honoring the IN-MEMORY cert toggle/alias
+        // so the user can test without saving first.
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = clientCertEnabled,
+            clientCertAlias = clientCertAlias
+        )
+        val client = HomeAssistantClient(targetUrl.trim(), token.trim(), httpClient)
+
+        scope.launch {
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            status = if (success) Status.Success else Status.Failed
+            testingLabel = null
+            error = client.error
         }
     }
 
@@ -144,8 +212,13 @@ fun MainSettingsScreen(
                 }
             }
         }
-    ) { _ ->
+    ) { innerPadding ->
         Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             when (selectedTab) {
@@ -153,28 +226,24 @@ fun MainSettingsScreen(
                     url = url,
                     token = token,
                     testing = testing,
+                    testingLabel = testingLabel,
+                    lastTestedLabel = lastTestedLabel,
                     status = status,
                     error = error,
+                    localUrlEnabled = localUrlEnabled,
+                    localUrl = localUrl,
+                    homeSsids = homeSsids,
+                    clientCertEnabled = clientCertEnabled,
+                    clientCertAlias = clientCertAlias,
                     onUrlChange = { url = it },
                     onTokenChange = { token = it },
-                    onTest = {
-                        testing = true
-                        status = Status.Testing
-                        val client = HomeAssistantClient(url, token)
-
-                        scope.launch {
-                            val success = withContext(Dispatchers.IO) {
-                                try {
-                                    client.ping()
-                                } catch (_: Exception) {
-                                    false
-                                }
-                            }
-                            status = if (success) Status.Success else Status.Failed
-                            testing = false
-                            error = client.error
-                        }
-                    }
+                    onLocalUrlEnabledChange = { localUrlEnabled = it },
+                    onLocalUrlChange = { localUrl = it },
+                    onHomeSsidsChange = { homeSsids = it },
+                    onClientCertEnabledChange = { clientCertEnabled = it },
+                    onClientCertAliasChange = { clientCertAlias = it },
+                    onTestRemote = { runTest("Remote", url) },
+                    onTestLocal = { runTest("Local", localUrl) }
                 )
 
                 SettingsTab.WEBSOCKET -> WebSocketTab(
@@ -270,16 +339,30 @@ private fun ConnectionTab(
     url: String,
     token: String,
     testing: Boolean,
+    testingLabel: String?,
+    lastTestedLabel: String?,
     status: Status,
     error: String?,
+    localUrlEnabled: Boolean,
+    localUrl: String,
+    homeSsids: Set<String>,
+    clientCertEnabled: Boolean,
+    clientCertAlias: String,
     onUrlChange: (String) -> Unit,
     onTokenChange: (String) -> Unit,
-    onTest: () -> Unit
+    onLocalUrlEnabledChange: (Boolean) -> Unit,
+    onLocalUrlChange: (String) -> Unit,
+    onHomeSsidsChange: (Set<String>) -> Unit,
+    onClientCertEnabledChange: (Boolean) -> Unit,
+    onClientCertAliasChange: (String) -> Unit,
+    onTestRemote: () -> Unit,
+    onTestLocal: () -> Unit
 ) {
     OutlinedTextField(
         value = url,
         onValueChange = onUrlChange,
-        label = { Text("Home Assistant URL") },
+        label = { Text("Remote Home Assistant URL") },
+        placeholder = { Text("https://ha.example.com") },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
     )
@@ -293,14 +376,327 @@ private fun ConnectionTab(
         singleLine = true
     )
 
+    // --- Client certificate section (applies to the remote URL) ---
+    ClientCertSection(
+        enabled = clientCertEnabled,
+        alias = clientCertAlias,
+        onEnabledChange = onClientCertEnabledChange,
+        onAliasChange = onClientCertAliasChange
+    )
+
+    val canTestRemote = !testing && url.isNotBlank() && token.isNotBlank()
+    val canTestLocal = !testing && localUrlEnabled && localUrl.isNotBlank() && token.isNotBlank()
+
     Button(
-        enabled = !testing && url.isNotBlank() && token.isNotBlank(),
-        onClick = onTest
+        enabled = canTestRemote,
+        onClick = onTestRemote
     ) {
-        Text(if (testing) "Testing..." else "Test Connection")
+        Text(
+            when {
+                testingLabel == "Remote" -> "Testing..."
+                localUrlEnabled -> "Test remote"
+                else -> "Test Connection"
+            }
+        )
     }
 
-    StatusRow(status, error)
+    // Show the last test outcome only for the remote URL here.
+    if (lastTestedLabel == "Remote") StatusRow(status, error)
+
+    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+    // --- Local URL section ---
+    LocalUrlSection(
+        enabled = localUrlEnabled,
+        localUrl = localUrl,
+        homeSsids = homeSsids,
+        onEnabledChange = onLocalUrlEnabledChange,
+        onLocalUrlChange = onLocalUrlChange,
+        onHomeSsidsChange = onHomeSsidsChange
+    )
+
+    if (localUrlEnabled) {
+        Button(
+            enabled = canTestLocal,
+            onClick = onTestLocal
+        ) {
+            Text(if (testingLabel == "Local") "Testing..." else "Test local")
+        }
+        if (lastTestedLabel == "Local") StatusRow(status, error)
+    }
+}
+
+@Composable
+private fun LocalUrlSection(
+    enabled: Boolean,
+    localUrl: String,
+    homeSsids: Set<String>,
+    onEnabledChange: (Boolean) -> Unit,
+    onLocalUrlChange: (String) -> Unit,
+    onHomeSsidsChange: (Set<String>) -> Unit
+) {
+    val context = LocalContext.current
+
+    // Location permission launcher for reading SSID
+    var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            // Permission just granted: start monitoring so the SSID is
+            // populated by the time the pending action runs.
+            NetworkHelper.startMonitoring(context)
+            pendingAction?.invoke()
+        } else {
+            Toast.makeText(
+                context,
+                "Precise location permission is required to detect the home WiFi network name. " +
+                "Please grant 'Precise' (not 'Approximate') location.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        pendingAction = null
+    }
+
+    fun withLocationPermission(action: () -> Unit) {
+        if (NetworkHelper.hasLocationPermission(context)) {
+            // Make sure the long-lived monitoring is running so the cached
+            // SSID is available when the user presses "Add current WiFi".
+            NetworkHelper.startMonitoring(context)
+            action()
+        } else {
+            pendingAction = action
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("URL when at home")
+        Switch(
+            checked = enabled,
+            onCheckedChange = { newValue ->
+                if (newValue) {
+                    withLocationPermission { onEnabledChange(true) }
+                } else {
+                    onEnabledChange(false)
+                }
+            }
+        )
+    }
+
+    if (!enabled) {
+        Text(
+            "Enable to use a different URL when connected to your home WiFi.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    OutlinedTextField(
+        value = localUrl,
+        onValueChange = onLocalUrlChange,
+        label = { Text("Local Home Assistant URL") },
+        placeholder = { Text("http://192.168.1.x:8123") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true
+    )
+
+    Spacer(Modifier.height(8.dp))
+
+    Text("Home WiFi networks", style = MaterialTheme.typography.titleSmall)
+    Text(
+        "When connected to one of these networks, the local URL will be used.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    Spacer(Modifier.height(4.dp))
+
+    // List of configured SSIDs
+    homeSsids.forEach { ssid ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Rounded.Wifi,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(ssid)
+            }
+            IconButton(onClick = { onHomeSsidsChange(homeSsids - ssid) }) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = "Remove $ssid",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+
+    // "Add current WiFi" button
+    val scope = rememberCoroutineScope()
+    var detecting by remember { mutableStateOf(false) }
+    OutlinedButton(
+        enabled = !detecting,
+        onClick = {
+            withLocationPermission {
+                detecting = true
+                scope.launch {
+                    // The long-lived NetworkCallback may not have fired yet
+                    // (especially if monitoring just started). Poll the cache
+                    // for up to ~2 seconds before giving up.
+                    var currentSsid = NetworkHelper.getCurrentSsid()
+                    var attempts = 0
+                    while (currentSsid == null && attempts < 20) {
+                        delay(100)
+                        currentSsid = NetworkHelper.getCurrentSsid()
+                        attempts++
+                    }
+                    detecting = false
+                    if (currentSsid != null) {
+                        onHomeSsidsChange(homeSsids + currentSsid)
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "Could not detect current WiFi network. Make sure you are connected to WiFi and that location services are enabled.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Rounded.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(if (detecting) "Detecting..." else "Add current WiFi")
+    }
+}
+
+@Composable
+private fun ClientCertSection(
+    enabled: Boolean,
+    alias: String,
+    onEnabledChange: (Boolean) -> Unit,
+    onAliasChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Use client certificate")
+        Switch(
+            checked = enabled,
+            onCheckedChange = onEnabledChange
+        )
+    }
+
+    if (!enabled) {
+        Text(
+            "Enable to authenticate to your remote URL with a client certificate (mTLS) " +
+                    "stored in the Android keystore.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Rounded.Lock,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Selected alias", style = MaterialTheme.typography.titleSmall)
+            Text(
+                alias.ifBlank { "Not selected" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (alias.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
+                        else MaterialTheme.colorScheme.onSurface
+            )
+        }
+        if (alias.isNotBlank()) {
+            IconButton(onClick = { onAliasChange("") }) {
+                Icon(
+                    Icons.Rounded.Close,
+                    contentDescription = "Clear alias",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+
+    OutlinedButton(
+        onClick = {
+            val activity = findActivity(context)
+            if (activity == null) {
+                Toast.makeText(
+                    context,
+                    "Cannot open certificate picker — host activity not found",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@OutlinedButton
+            }
+            // Permission to read the chosen private key is granted to this app once
+            // the user picks. Subsequent KeyChain.getPrivateKey() calls will not
+            // prompt — important for background tasks while the device is locked.
+            KeyChain.choosePrivateKeyAlias(
+                activity,
+                { chosen ->
+                    Handler(Looper.getMainLooper()).post {
+                        if (chosen != null) onAliasChange(chosen)
+                    }
+                },
+                arrayOf("RSA", "EC"),
+                null,
+                null,
+                -1,
+                alias.ifBlank { null }
+            )
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(Icons.Rounded.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(if (alias.isBlank()) "Choose certificate" else "Change certificate")
+    }
+
+    Text(
+        "The certificate must be installed in Android (Settings → Security → Encryption " +
+                "& credentials → Install a certificate → VPN & app user certificate). " +
+                "Don't forget to save after picking.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+private fun findActivity(context: Context): Activity? {
+    var ctx: Context? = context
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }
 
 @Composable
@@ -418,7 +814,8 @@ private fun StatusRow(status: Status, error: String? = null) {
         Status.Idle -> ""
         Status.Testing -> "Testing connection..."
         Status.Success -> "✅ Connected successfully!"
-        Status.Failed -> "❌ Failed to connect: " + (error ?: "Unknown error")
+        Status.Failed -> "❌ Failed to connect: " +
+                (error?.takeIf { it.isNotBlank() } ?: "Unknown error")
     }
     Text(text)
 }

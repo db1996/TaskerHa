@@ -13,6 +13,15 @@ object HaSettings {
     private const val KEY_LOG_LEVEL_GENERAL = "log_level_general"
     private const val KEY_LOG_LEVEL_WS = "log_level_ws"
 
+    // Local/home URL feature
+    private const val KEY_LOCAL_URL_ENABLED = "local_url_enabled"
+    private const val KEY_LOCAL_URL = "ha_local_url"
+    private const val KEY_HOME_SSIDS = "home_ssids"
+
+    // Client certificate (mTLS) feature
+    private const val KEY_CLIENT_CERT_ENABLED = "client_cert_enabled"
+    private const val KEY_CLIENT_CERT_ALIAS = "client_cert_alias"
+
     fun save(context: Context, url: String, token: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit {
@@ -24,6 +33,83 @@ object HaSettings {
     fun loadUrl(context: Context): String {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(KEY_URL, "") ?: ""
+    }
+
+    // --- Local URL settings ---
+
+    fun saveLocalUrlEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_LOCAL_URL_ENABLED, enabled) }
+    }
+
+    fun loadLocalUrlEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_LOCAL_URL_ENABLED, false)
+    }
+
+    fun saveLocalUrl(context: Context, url: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putString(KEY_LOCAL_URL, url) }
+    }
+
+    fun loadLocalUrl(context: Context): String {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_LOCAL_URL, "") ?: ""
+    }
+
+    fun saveHomeSsids(context: Context, ssids: Set<String>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putStringSet(KEY_HOME_SSIDS, ssids) }
+    }
+
+    fun loadHomeSsids(context: Context): Set<String> {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getStringSet(KEY_HOME_SSIDS, emptySet()) ?: emptySet()
+    }
+
+    // --- Client certificate settings ---
+
+    fun saveClientCertEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putBoolean(KEY_CLIENT_CERT_ENABLED, enabled) }
+    }
+
+    fun loadClientCertEnabled(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_CLIENT_CERT_ENABLED, false)
+    }
+
+    fun saveClientCertAlias(context: Context, alias: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putString(KEY_CLIENT_CERT_ALIAS, alias) }
+    }
+
+    fun loadClientCertAlias(context: Context): String {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_CLIENT_CERT_ALIAS, "") ?: ""
+    }
+
+    /**
+     * Resolves the appropriate URL based on current network context.
+     * If the "local URL" feature is enabled and the device is currently connected
+     * to one of the configured home WiFi SSIDs, returns the local URL.
+     * Otherwise returns the remote/internet URL.
+     */
+    fun resolveUrl(context: Context): String {
+        if (!loadLocalUrlEnabled(context)) return loadUrl(context)
+
+        val localUrl = loadLocalUrl(context)
+        if (localUrl.isBlank()) return loadUrl(context)
+
+        val homeSsids = loadHomeSsids(context)
+        if (homeSsids.isEmpty()) return loadUrl(context)
+
+        val currentSsid = com.github.db1996.taskerha.util.NetworkHelper.getCurrentSsid()
+        if (currentSsid != null && homeSsids.contains(currentSsid)) {
+            return localUrl
+        }
+
+        return loadUrl(context)
     }
 
     fun loadToken(context: Context): String {

@@ -28,17 +28,21 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import java.io.IOException
+import javax.net.ssl.SSLException
+import javax.net.ssl.SSLHandshakeException
 
 class HomeAssistantClient(
     var baseUrl: String = "",
-    var accessToken: String = ""
+    var accessToken: String = "",
+    httpClient: OkHttpClient = OkHttpClient()
 ): BaseLogger {
 
     override val logTag: String
         get() = "HomeAssistantClient"
 
-    private val http = OkHttpClient()
+    private val http = httpClient
     private val json = Json { ignoreUnknownKeys = true }
 
     var error: String = ""
@@ -58,6 +62,43 @@ class HomeAssistantClient(
             accessToken.isEmpty() -> HomeassistantStatus.NO_TOKEN
             else -> HomeassistantStatus.CONNECTING
         }
+    }
+
+    // --- Error formatting helpers
+    private fun formatHttpError(response: Response, body: String? = null): String {
+        if (response.code == 401) return "Unauthorized, check your token"
+        val reason = response.message.takeIf { it.isNotBlank() }
+        // HTTP/2 omits the reason phrase; surface the status code so the user always sees something.
+        val base = if (reason != null) "HTTP ${response.code} ($reason)" else "HTTP ${response.code}"
+        val hint = extractBodyHint(body)
+        return if (hint != null) "$base — $hint" else base
+    }
+
+    private fun extractBodyHint(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        // Cloudflare and other proxies often return an HTML error page; surface the
+        // first <title> or <h1> so the user gets a real reason instead of just the code.
+        val titleRegex = Regex("<title[^>]*>([^<]+)</title>", RegexOption.IGNORE_CASE)
+        val h1Regex = Regex("<h1[^>]*>([^<]+)</h1>", RegexOption.IGNORE_CASE)
+        val match = titleRegex.find(body) ?: h1Regex.find(body)
+        if (match != null) {
+            val text = match.groupValues[1].trim()
+            if (text.isNotEmpty()) return text.take(200)
+        }
+        // Fallback for non-HTML bodies: take the first non-blank line.
+        val firstLine = body.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+        return firstLine?.take(200)
+    }
+
+    private fun formatException(e: Throwable, prefix: String = "Can't connect to Home Assistant"): String {
+        val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+        val hint = when (e) {
+            is SSLHandshakeException ->
+                " — TLS handshake failed (server may require a client certificate; enable 'Use client certificate' in settings)"
+            is SSLException -> " — TLS error"
+            else -> ""
+        }
+        return "$prefix: $detail$hint"
     }
 
     // --- Headers and request
@@ -84,8 +125,8 @@ class HomeAssistantClient(
             logVerbose("Ping url ${response.request.url}")
 
             if (!response.isSuccessful) {
-                error =
-                    if (response.code == 401) "Unauthorized, check your token" else response.message
+                val body = runCatching { response.body?.string() }.getOrNull()
+                error = formatHttpError(response, body)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                 false
             } else {
@@ -93,7 +134,7 @@ class HomeAssistantClient(
                 true
             }
         } catch (e: Exception) {
-            error = "Can't connect to Home Assistant: $e"
+            error = formatException(e)
             homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
             false
         }
@@ -105,15 +146,19 @@ class HomeAssistantClient(
 
         try {
             val response = http.newCall(request("/api/states")).execute()
-            if (!response.isSuccessful) return@withContext emptyList()
+            val body = response.body?.string()
+            if (!response.isSuccessful) {
+                error = formatHttpError(response, body)
+                return@withContext emptyList()
+            }
 
-            val body = response.body?.string() ?: return@withContext emptyList()
+            if (body == null) return@withContext emptyList()
             entities = json.decodeFromString(body)
             entities
 
 
         } catch (e: Exception) {
-            error = e.toString()
+            error = formatException(e)
             emptyList()
         }
 
@@ -127,17 +172,18 @@ class HomeAssistantClient(
 
             try {
                 val response = http.newCall(request("/api/services")).execute()
+                val body = response.body?.string()
                 if (!response.isSuccessful) {
-                    error = response.message
+                    error = formatHttpError(response, body)
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     return@withContext emptyList()
                 }
 
-                val body = response.body?.string() ?: return@withContext emptyList()
+                if (body == null) return@withContext emptyList()
                 services = json.decodeFromString(body)
                 services
             } catch (e: Exception) {
-                error = e.toString()
+                error = formatException(e)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                 emptyList()
             }
@@ -164,8 +210,7 @@ class HomeAssistantClient(
                 logVerbose("Response: $response")
                 result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
-                    error =
-                        if (response.code == 401) "Unauthorized, check your token" else response.message
+                    error = formatHttpError(response, result)
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     false
                 } else {
@@ -173,7 +218,7 @@ class HomeAssistantClient(
                     true
                 }
             } catch (e: IOException) {
-                error = e.toString()
+                error = formatException(e)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                 false
             }
@@ -204,8 +249,7 @@ class HomeAssistantClient(
 
                 result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
-                    error =
-                        if (response.code == 401) "Unauthorized, check your token" else response.message
+                    error = formatHttpError(response, result)
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     false
                 } else {
@@ -213,7 +257,7 @@ class HomeAssistantClient(
                     true
                 }
             } catch (e: IOException) {
-                error = e.toString()
+                error = formatException(e)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                 false
             }
@@ -241,8 +285,7 @@ class HomeAssistantClient(
 
                 result = response.body?.string() ?: ""
                 if (!response.isSuccessful) {
-                    error =
-                        if (response.code == 401) "Unauthorized, check your token" else response.message
+                    error = formatHttpError(response, result)
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     false
                 } else {
@@ -250,7 +293,7 @@ class HomeAssistantClient(
                     true
                 }
             } catch (e: IOException) {
-                error = e.toString()
+                error = formatException(e)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                 false
             }

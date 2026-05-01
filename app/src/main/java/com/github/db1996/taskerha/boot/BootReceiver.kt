@@ -31,9 +31,10 @@ class BootReceiver : BroadcastReceiver() {
         }
 
         val url = HaSettings.loadUrl(context)
+        val localUrl = HaSettings.loadLocalUrl(context)
         val token = HaSettings.loadToken(context)
 
-        if (url.isBlank() || token.isBlank()) {
+        if (url.isBlank() && localUrl.isBlank() || token.isBlank()) {
             CustomLogger.e(TAG, "HA URL/token missing, not starting service")
             return
         }

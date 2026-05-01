@@ -7,6 +7,7 @@ import android.os.Build
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.util.EntityRecents
+import com.github.db1996.taskerha.util.NetworkHelper
 import com.github.db1996.taskerha.util.PrefsJsonStore
 import com.github.db1996.taskerha.util.ServiceRecents
 
@@ -32,6 +33,11 @@ class TaskerHaApplication : Application() {
         ServiceRecents.init(this)
         PrefsJsonStore.init(this)
         createForegroundChannel()
+
+        // Start WiFi monitoring for SSID-based URL resolution.
+        // This is a no-op if location permission has not been granted yet;
+        // it will be retried from the Settings screen after the user grants it.
+        NetworkHelper.startMonitoring(this)
     }
 
     private fun createForegroundChannel() {
