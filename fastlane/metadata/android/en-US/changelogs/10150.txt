@@ -3,3 +3,5 @@
   - Automatic switching with local URL
 - Now supports multiple entity ids for HA On trigger state profile. 
 - Automatic resubscribing to triggers when editing/creating profiles
+- Made triggers (tasker profiles) managed in app, you can delete dead triggers
+- Websocket triggers are managed smarter
