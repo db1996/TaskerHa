@@ -1,0 +1,5 @@
+- More connectivity options - Credit to @SimoneAvogadro for this pull request
+  - Self signed cert
+  - Automatic switching with local URL
+- Now supports multiple entity ids for HA On trigger state profile. 
+- Automatic resubscribing to triggers when editing/creating profiles
