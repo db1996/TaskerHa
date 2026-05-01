@@ -30,6 +30,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
     override fun convertBuiltFormToInput(builtForm: OnTriggerStateBuiltForm): OnTriggerStateInput {
         return OnTriggerStateInput().apply {
             entityId = builtForm.entityId
+            entityIds = builtForm.entityIds.joinToString(",")
             fromState = builtForm.fromState
             toState = builtForm.toState
             forDuration = builtForm.forDuration
@@ -37,12 +38,23 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
     }
 
     override fun convertInputToBuiltForm(input: OnTriggerStateInput): OnTriggerStateBuiltForm {
+        val parsedEntityIds = input.entityIds
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
         return OnTriggerStateBuiltForm(
             entityId = input.entityId,
+            entityIds = parsedEntityIds,
             fromState = input.fromState,
             toState = input.toState,
             forDuration = input.forDuration,
-            blurb = "Get state: ${input.entityId}"
+            blurb = if (parsedEntityIds.isNotEmpty()) {
+                "Get state: ${parsedEntityIds.joinToString(", ")}"
+            } else if (input.entityId.isNotBlank()) {
+                "Get state: ${input.entityId}"
+            } else {
+                "Get state: (any entity)"
+            }
         )
     }
 

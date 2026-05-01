@@ -433,21 +433,27 @@ class HaWebSocketService : Service(), BaseLogger {
         val prefs = applicationContext.getSharedPreferences("TriggerStatePrefs", Context.MODE_PRIVATE)
         val items = prefs.getStringSet("items", emptySet()) ?: emptySet()
 
-        return items.mapNotNull { raw ->
+        return items.flatMap { raw ->
             runCatching {
                 val built = payloadJson.decodeFromString<OnTriggerStateBuiltForm>(raw)
 
-                val entity = built.entityId.trim()
-                if (entity.isBlank()) return@runCatching null
+                // Prefer multi-entity list; fall back to legacy single entityId
+                val effectiveIds = if (built.entityIds.isNotEmpty()) {
+                    built.entityIds.map { it.trim() }.filter { it.isNotBlank() }
+                } else {
+                    listOf(built.entityId.trim()).filter { it.isNotBlank() }
+                }
 
-                StateTrigger(
-                    platform = "state",
-                    entity_id = entity,
-                    from = built.fromState.trim().takeIf { it.isNotBlank() },
-                    to = built.toState.trim().takeIf { it.isNotBlank() },
-                    for_ = parseForDuration(built.forDuration)
-                )
-            }.getOrNull()
+                effectiveIds.map { entity ->
+                    StateTrigger(
+                        platform = "state",
+                        entity_id = entity,
+                        from = built.fromState.trim().takeIf { it.isNotBlank() },
+                        to = built.toState.trim().takeIf { it.isNotBlank() },
+                        for_ = parseForDuration(built.forDuration)
+                    )
+                }
+            }.getOrElse { emptyList() }
         }
     }
 

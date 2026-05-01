@@ -1,11 +1,19 @@
 package com.github.db1996.taskerha.tasker.ontriggerstate.screens
 
-import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -21,14 +29,14 @@ import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.view.OnTriggerStateViewModel
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OnTriggerStateScreen(
     viewModel: OnTriggerStateViewModel,
     onSave: (OnTriggerStateBuiltForm) -> Unit
 ) {
-    var entitySearching by remember { mutableStateOf(false) }
+    var entityAdding by remember { mutableStateOf(false) }
 
-    // Load entities on first composition
     LaunchedEffect(Unit) {
         viewModel.loadEntities()
     }
@@ -58,40 +66,81 @@ fun OnTriggerStateScreen(
                 Text("Please check your connection settings in the main app outside of tasker")
             }
 
-            // Domain search filter
-            if (entitySearching) {
+            if (entityAdding) {
+                // Domain search filter
                 TextField(
                     value = viewModel.currentDomainSearch,
                     onValueChange = { viewModel.currentDomainSearch = it },
                     label = { Text("Filter domain") },
                     modifier = Modifier.fillMaxWidth()
                 )
-            }
 
-            // Entity selector
-            EntitySelector(
-                entities = viewModel.entities,
-                serviceDomain = viewModel.currentDomainSearch,
-                currentEntityId = form.entityId,
-                searching = entitySearching,
-                onSearchChanged = { entitySearching = it },
-                onEntitySelected = { viewModel.pickEntity(it) },
-                onEntityIdChanged = { viewModel.pickEntity(it) }
-            )
+                // Entity selector (adds entity on pick)
+                EntitySelector(
+                    entities = viewModel.entities,
+                    serviceDomain = viewModel.currentDomainSearch,
+                    currentEntityId = "",
+                    searching = true,
+                    onSearchChanged = { if (!it) entityAdding = false },
+                    onEntitySelected = { id ->
+                        viewModel.addEntity(id)
+                        entityAdding = false
+                    },
+                    onEntityIdChanged = {}
+                )
+            } else {
+                // Chips showing the currently selected entities
+                if (form.entityIds.isNotEmpty()) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        form.entityIds.forEach { entityId ->
+                            InputChip(
+                                selected = false,
+                                onClick = {},
+                                label = { Text(entityId) },
+                                trailingIcon = {
+                                    IconButton(onClick = { viewModel.removeEntity(entityId) }) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Close,
+                                            contentDescription = "Remove $entityId"
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
 
-            if(!entitySearching) {
+                // Add Entity button
+                OutlinedButton(
+                    onClick = { entityAdding = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Add Entity")
+                }
+
+                // From / To / For filters
                 TextField(
                     value = form.fromState,
                     onValueChange = { viewModel.setFrom(it) },
                     label = { Text("From") },
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 TextField(
                     value = form.toState,
                     onValueChange = { viewModel.setTo(it) },
                     label = { Text("To") },
+                    modifier = Modifier.fillMaxWidth()
                 )
-                Log.e("TESTTESTTEST", "${form.forDuration}")
+
                 DurationHmsStringField(
                     value = form.forDuration,
                     onValueChange = { viewModel.setFor(it) },
@@ -101,4 +150,5 @@ fun OnTriggerStateScreen(
         }
     }
 }
+
 

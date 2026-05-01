@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 
 data class OnTriggerStateForm(
     var entityId: String = "",
+    var entityIds: List<String> = emptyList(),
     var fromState: String = "",
     var toState: String = "",
     var forDuration: String = ""
@@ -21,11 +22,12 @@ val json = Json {
 
 @Serializable
 data class OnTriggerStateBuiltForm(
-    val entityId: String,
-    val blurb: String,
-    val fromState: String,
-    val toState: String,
-    val forDuration: String
+    val entityId: String = "",
+    val entityIds: List<String> = emptyList(),
+    val blurb: String = "",
+    val fromState: String = "",
+    val toState: String = "",
+    val forDuration: String = ""
 ) : SavePrefsJson {
     override fun prefsName(): String = "TriggerStatePrefs"
 

@@ -53,31 +53,46 @@ class OnTriggerStateRunner :
             return configVal == eventVal
         }
         fun matchesFor(configVal: String, eventVal: String): Boolean {
-            // blank means "ignore"
             if (configVal.isBlank()) return true
             return configVal.trim() == eventVal
         }
-        if(update.entityId != null && config.entityId != ""){
-            if (!matches(config.entityId.trim(), update.entityId)) {
+
+        // Build effective entity list: prefer multi-entity field, fall back to legacy single field
+        val multiIds = config.entityIds
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        val effectiveIds = if (multiIds.isNotEmpty()) {
+            multiIds
+        } else {
+            listOf(config.entityId.trim()).filter { it.isNotBlank() }
+        }
+
+        // Populate output entityIds (comma-separated)
+        update.entityIds = effectiveIds.joinToString(",")
+
+        if (effectiveIds.isNotEmpty()) {
+            // Entity filter: event entity must be in the configured list
+            if (update.entityId == null || update.entityId !in effectiveIds) {
                 return TaskerPluginResultConditionUnsatisfied()
             }
 
-            if(update.fromState != null){
+            if (update.fromState != null) {
                 if (!matches(config.fromState.trim(), update.fromState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
-            }else{
-                if(config.toState.isNotBlank()) {
+            } else {
+                if (config.fromState.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
 
-            if(update.toState != null) {
+            if (update.toState != null) {
                 if (!matches(config.toState.trim(), update.toState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
-            }else{
-                if(config.toState.isNotBlank()) {
+            } else {
+                if (config.toState.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
