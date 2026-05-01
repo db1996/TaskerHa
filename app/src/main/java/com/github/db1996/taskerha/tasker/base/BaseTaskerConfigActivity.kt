@@ -137,6 +137,12 @@ abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM :
     }
 
     /**
+     * Called after the form is saved to prefs and before Tasker is notified.
+     * Override in subclasses to react to a successful save (e.g. trigger resubscription).
+     */
+    protected open fun onAfterSave(builtForm: B) {}
+
+    /**
      * Handle the save action from the UI
      */
     private fun handleSave(builtForm: B) {
@@ -154,6 +160,7 @@ abstract class BaseTaskerConfigActivity<I : Any, O : Any, F : Any, B : Any, VM :
             PrefsJsonStore.add(builtForm)
         }
 
+        onAfterSave(builtForm)
         currentBuiltForm = builtForm
         helper.finishForTasker()
     }

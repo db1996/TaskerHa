@@ -2,6 +2,7 @@ package com.github.db1996.taskerha.tasker.ontriggerstate
 
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.tasker.ontriggerstate.screens.OnTriggerStateScreen
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
@@ -60,6 +61,10 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
 
     override fun validateBeforeSave(builtForm: OnTriggerStateBuiltForm): String? {
         return null
+    }
+
+    override fun onAfterSave(builtForm: OnTriggerStateBuiltForm) {
+        HaWebSocketService.resubscribeTriggers(this)
     }
 }
 

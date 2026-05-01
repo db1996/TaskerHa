@@ -40,6 +40,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -47,6 +48,13 @@ import java.util.logging.Logger
 class HaWebSocketService : Service(), BaseLogger {
     private val json = Json { ignoreUnknownKeys = true }
     private val TRIGGER_STATE_EVENT_ID = 2
+
+    // Ever-increasing message ID counter for WS messages (HA requires strictly increasing IDs)
+    private val messageIdCounter = AtomicInteger(TRIGGER_STATE_EVENT_ID)
+
+    // Tracks the subscription ID of the current state trigger subscription (null = not yet subscribed)
+    @Volatile
+    private var currentTriggerSubId: Int? = null
 
     override val logTag: String
         get() = "HaWebSocketService"
@@ -58,6 +66,7 @@ class HaWebSocketService : Service(), BaseLogger {
         const val TAG = "HaWebSocketService"
         const val CHANNEL_ID = "ha_websocket_channel"
         const val NOTIFICATION_ID = 1001
+        const val ACTION_RESUBSCRIBE_TRIGGERS = "com.github.db1996.taskerha.RESUBSCRIBE_TRIGGERS"
 
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
@@ -70,6 +79,13 @@ class HaWebSocketService : Service(), BaseLogger {
         fun stop(context: Context) {
             val intent = Intent(context, HaWebSocketService::class.java)
             context.stopService(intent)
+        }
+
+        fun resubscribeTriggers(context: Context) {
+            val intent = Intent(context, HaWebSocketService::class.java).apply {
+                action = ACTION_RESUBSCRIBE_TRIGGERS
+            }
+            context.startService(intent)
         }
     }
 
@@ -101,6 +117,11 @@ class HaWebSocketService : Service(), BaseLogger {
 
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RESUBSCRIBE_TRIGGERS) {
+            doResubscribeTriggers()
+            return START_STICKY
+        }
+
         if (!startForegroundSafely("Connecting to Home Assistant...")) {
             stopSelf()
             return START_NOT_STICKY
@@ -278,15 +299,18 @@ class HaWebSocketService : Service(), BaseLogger {
                                 if (triggers.isEmpty()) {
                                     logInfo("No TriggerStatePrefs stored; skipping subscribe_trigger")
                                 } else {
+                                    val subId = TRIGGER_STATE_EVENT_ID
                                     val req = SubscribeTriggerRequest(
                                         type = "subscribe_trigger",
-                                        id = TRIGGER_STATE_EVENT_ID,
+                                        id = subId,
                                         trigger = triggers
                                     )
                                     val body = payloadJson.encodeToString(req)
                                     logInfo("Subscribing to ${triggers.size} state trigger(s)")
                                     logInfo(json.encodeToString(req))
                                     webSocket.send(body)
+                                    currentTriggerSubId = subId
+                                    messageIdCounter.set(subId)
                                 }
 
                             }
@@ -429,6 +453,47 @@ class HaWebSocketService : Service(), BaseLogger {
         encodeDefaults = true
         prettyPrint = false
     }
+    private fun doResubscribeTriggers() {
+        val ws = webSocket
+        if (ws == null) {
+            logInfo("doResubscribeTriggers: no active WebSocket, will subscribe on next connect")
+            return
+        }
+
+        serviceScope.launch {
+            try {
+                // Unsubscribe the existing state trigger subscription if any
+                val oldSubId = currentTriggerSubId
+                if (oldSubId != null) {
+                    val unsubId = messageIdCounter.incrementAndGet()
+                    val unsubMsg = """{"id":$unsubId,"type":"unsubscribe_events","subscription":$oldSubId}"""
+                    logInfo("Unsubscribing state trigger subscription $oldSubId (msg id=$unsubId)")
+                    ws.send(unsubMsg)
+                    currentTriggerSubId = null
+                }
+
+                val triggers = loadTriggerStateSubs()
+                if (triggers.isEmpty()) {
+                    logInfo("doResubscribeTriggers: no triggers in prefs, not resubscribing")
+                    return@launch
+                }
+
+                val newSubId = messageIdCounter.incrementAndGet()
+                val req = SubscribeTriggerRequest(
+                    type = "subscribe_trigger",
+                    id = newSubId,
+                    trigger = triggers
+                )
+                val body = payloadJson.encodeToString(req)
+                logInfo("Resubscribing to ${triggers.size} state trigger(s) (sub id=$newSubId)")
+                ws.send(body)
+                currentTriggerSubId = newSubId
+            } catch (t: Throwable) {
+                logError("doResubscribeTriggers failed", t)
+            }
+        }
+    }
+
     private fun loadTriggerStateSubs(): List<StateTrigger> {
         val prefs = applicationContext.getSharedPreferences("TriggerStatePrefs", Context.MODE_PRIVATE)
         val items = prefs.getStringSet("items", emptySet()) ?: emptySet()
