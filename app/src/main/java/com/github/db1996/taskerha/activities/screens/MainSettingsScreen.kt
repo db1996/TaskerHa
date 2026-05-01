@@ -50,7 +50,8 @@ import kotlinx.coroutines.withContext
 private enum class SettingsTab(val label: String) {
     CONNECTION("Connection"),
     WEBSOCKET("WebSocket"),
-    LOGGING("Logging")
+    TRIGGERS("Triggers"),
+    LOGGING("Logging"),
 }
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -291,6 +292,8 @@ fun MainSettingsScreen(
                         context.startActivity(chooser)
                     }
                 )
+
+                SettingsTab.TRIGGERS -> ActiveTriggersTab()
             }
         }
     }
