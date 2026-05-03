@@ -10,6 +10,7 @@ import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
+import java.util.UUID
 
 class OnTriggerStateViewModel(
     client: HomeAssistantClient
@@ -35,6 +36,23 @@ class OnTriggerStateViewModel(
         form = form.copy(entityId = entityId)
     }
 
+    fun addEntity(entityId: String) {
+        val trimmed = entityId.trim()
+        if (trimmed.isNotBlank() && trimmed !in form.entityIds) {
+            form = form.copy(entityIds = form.entityIds + trimmed)
+        }
+    }
+
+    fun removeEntity(index: Int) {
+        form = form.copy(entityIds = form.entityIds.toMutableList().also { it.removeAt(index) })
+    }
+
+    fun updateEntityAt(index: Int, value: String) {
+        val updated = form.entityIds.toMutableList()
+        updated[index] = value
+        form = form.copy(entityIds = updated)
+    }
+
     fun setFrom(fromState: String) {
         form = form.copy(fromState = fromState)
     }
@@ -48,19 +66,33 @@ class OnTriggerStateViewModel(
     }
 
     override fun buildForm(): OnTriggerStateBuiltForm {
+        val blurb = when {
+            form.entityIds.isNotEmpty() -> "Get state: ${form.entityIds.joinToString(", ")}"
+            form.entityId.isNotBlank() -> "Get state: ${form.entityId}"
+            else -> "Get state: (any entity)"
+        }
         return OnTriggerStateBuiltForm(
-            entityId = form.entityId,
+            entityId = "",
+            entityIds = form.entityIds,
             fromState = form.fromState,
             toState = form.toState,
-            blurb = "Get state: ${form.entityId}",
-            forDuration = form.forDuration
+            blurb = blurb,
+            forDuration = form.forDuration,
+            triggerId = UUID.randomUUID().toString()
         )
     }
 
     override fun restoreForm(data: OnTriggerStateBuiltForm) {
-        logVerbose("Restoring form: entityId=${data.entityId}, fromState=${data.fromState}, toState=${data.toState}")
+        logVerbose("Restoring form: entityId=${data.entityId}, entityIds=${data.entityIds}, fromState=${data.fromState}, toState=${data.toState}")
+        // Migrate legacy single entityId into the multi-entity list
+        val migratedIds = if (data.entityIds.isEmpty() && data.entityId.isNotBlank()) {
+            listOf(data.entityId.trim())
+        } else {
+            data.entityIds
+        }
         form = OnTriggerStateForm(
             entityId = data.entityId,
+            entityIds = migratedIds,
             fromState = data.fromState,
             toState = data.toState,
             forDuration = data.forDuration
@@ -72,9 +104,7 @@ class OnTriggerStateViewModel(
     }
 
     override fun validateForm(): ValidationResult {
-        if (form.entityId.isBlank()) {
-            return ValidationResult.Invalid("Entity ID cannot be empty")
-        }
+        // Both entityId (legacy) and entityIds (multi) are optional; no entity filter = wildcard
         return ValidationResult.Valid
     }
 

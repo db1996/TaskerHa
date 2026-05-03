@@ -9,6 +9,9 @@ class OnTriggerStateInput {
     @field:TaskerInputField("entityId")
     var entityId: String = ""
 
+    @field:TaskerInputField("entityIds")
+    var entityIds: String = ""
+
     @field:TaskerInputField("fromState")
     var fromState: String = ""
 
@@ -17,4 +20,7 @@ class OnTriggerStateInput {
 
     @field:TaskerInputField("forDuration")
     var forDuration: String = ""
+
+    @field:TaskerInputField("triggerId")
+    var triggerId: String = ""
 }

@@ -2,6 +2,7 @@ package com.github.db1996.taskerha.tasker.ontriggerstate
 
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.tasker.ontriggerstate.screens.OnTriggerStateScreen
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
@@ -30,24 +31,42 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
     override fun convertBuiltFormToInput(builtForm: OnTriggerStateBuiltForm): OnTriggerStateInput {
         return OnTriggerStateInput().apply {
             entityId = builtForm.entityId
+            entityIds = builtForm.entityIds.joinToString(",")
             fromState = builtForm.fromState
             toState = builtForm.toState
             forDuration = builtForm.forDuration
+            triggerId = builtForm.triggerId ?: ""
         }
     }
 
     override fun convertInputToBuiltForm(input: OnTriggerStateInput): OnTriggerStateBuiltForm {
+        val parsedEntityIds = input.entityIds
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
         return OnTriggerStateBuiltForm(
             entityId = input.entityId,
+            entityIds = parsedEntityIds,
             fromState = input.fromState,
             toState = input.toState,
             forDuration = input.forDuration,
-            blurb = "Get state: ${input.entityId}"
+            triggerId = input.triggerId.takeIf { it.isNotBlank() },
+            blurb = if (parsedEntityIds.isNotEmpty()) {
+                "Get state: ${parsedEntityIds.joinToString(", ")}"
+            } else if (input.entityId.isNotBlank()) {
+                "Get state: ${input.entityId}"
+            } else {
+                "Get state: (any entity)"
+            }
         )
     }
 
     override fun validateBeforeSave(builtForm: OnTriggerStateBuiltForm): String? {
         return null
+    }
+
+    override fun onAfterSave(builtForm: OnTriggerStateBuiltForm) {
+        HaWebSocketService.resubscribeTriggers(this)
     }
 }
 

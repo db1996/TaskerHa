@@ -39,7 +39,9 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -47,6 +49,13 @@ import java.util.logging.Logger
 class HaWebSocketService : Service(), BaseLogger {
     private val json = Json { ignoreUnknownKeys = true }
     private val TRIGGER_STATE_EVENT_ID = 2
+
+    // Ever-increasing message ID counter for WS messages (HA requires strictly increasing IDs)
+    private val messageIdCounter = AtomicInteger(TRIGGER_STATE_EVENT_ID)
+
+    // Maps WS subscription message ID -> triggerId (empty string = legacy batch subscription)
+    // Only IDs present in this map are considered active; events with unknown IDs are ignored.
+    private val wsSubIdToTriggerId = ConcurrentHashMap<Int, String>()
 
     override val logTag: String
         get() = "HaWebSocketService"
@@ -58,6 +67,7 @@ class HaWebSocketService : Service(), BaseLogger {
         const val TAG = "HaWebSocketService"
         const val CHANNEL_ID = "ha_websocket_channel"
         const val NOTIFICATION_ID = 1001
+        const val ACTION_RESUBSCRIBE_TRIGGERS = "com.github.db1996.taskerha.RESUBSCRIBE_TRIGGERS"
 
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
@@ -70,6 +80,13 @@ class HaWebSocketService : Service(), BaseLogger {
         fun stop(context: Context) {
             val intent = Intent(context, HaWebSocketService::class.java)
             context.stopService(intent)
+        }
+
+        fun resubscribeTriggers(context: Context) {
+            val intent = Intent(context, HaWebSocketService::class.java).apply {
+                action = ACTION_RESUBSCRIBE_TRIGGERS
+            }
+            context.startService(intent)
         }
     }
 
@@ -101,6 +118,11 @@ class HaWebSocketService : Service(), BaseLogger {
 
     @RequiresApi(Build.VERSION_CODES.S)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_RESUBSCRIBE_TRIGGERS) {
+            doResubscribeTriggers()
+            return START_STICKY
+        }
+
         if (!startForegroundSafely("Connecting to Home Assistant...")) {
             stopSelf()
             return START_NOT_STICKY
@@ -261,32 +283,38 @@ class HaWebSocketService : Service(), BaseLogger {
                                 reconnectAttempts = 0
                                 reconnectJob?.cancel()
                                 webSocket.send("""{"id":1,"type":"subscribe_events","event_type":"taskerha_message"}""")
-//                                val testeventSub = "{\n" +
-//                                        "    \"id\": 1,\n" +
-//                                        "    \"type\": \"subscribe_trigger\",\n" +
-//                                        "    \"trigger\": {\n" +
-//                                        "        \"platform\": \"state\",\n" +
-//                                        "        \"entity_id\": \"light.pc_kamer_2\"\n" +
-//                                        "    }\n" +
-//                                        "}";
-//                                logInfo(testeventSub)
-//
-//                                webSocket.send(testeventSub)
+                                // Reset counter to 1 (id=1 already used above); triggers get 2, 3, …
+                                messageIdCounter.set(1)
+                                wsSubIdToTriggerId.clear()
+                                val (perIdGroups, legacyTriggers) = loadTriggerStateSubs()
 
-                                val triggers = loadTriggerStateSubs()
-
-                                if (triggers.isEmpty()) {
+                                if (perIdGroups.isEmpty() && legacyTriggers.isEmpty()) {
                                     logInfo("No TriggerStatePrefs stored; skipping subscribe_trigger")
                                 } else {
-                                    val req = SubscribeTriggerRequest(
-                                        type = "subscribe_trigger",
-                                        id = TRIGGER_STATE_EVENT_ID,
-                                        trigger = triggers
-                                    )
-                                    val body = payloadJson.encodeToString(req)
-                                    logInfo("Subscribing to ${triggers.size} state trigger(s)")
-                                    logInfo(json.encodeToString(req))
-                                    webSocket.send(body)
+                                    // One subscription per UUID group
+                                    for ((triggerId, triggers) in perIdGroups) {
+                                        val subId = messageIdCounter.incrementAndGet()
+                                        val req = SubscribeTriggerRequest(
+                                            type = "subscribe_trigger",
+                                            id = subId,
+                                            trigger = triggers
+                                        )
+                                        webSocket.send(payloadJson.encodeToString(req))
+                                        wsSubIdToTriggerId[subId] = triggerId
+                                        logInfo("Subscribed triggerId=$triggerId (wsId=$subId, ${triggers.size} entity/ies)")
+                                    }
+                                    // One batch subscription for all legacy (no UUID) triggers
+                                    if (legacyTriggers.isNotEmpty()) {
+                                        val subId = messageIdCounter.incrementAndGet()
+                                        val req = SubscribeTriggerRequest(
+                                            type = "subscribe_trigger",
+                                            id = subId,
+                                            trigger = legacyTriggers
+                                        )
+                                        webSocket.send(payloadJson.encodeToString(req))
+                                        wsSubIdToTriggerId[subId] = "" // empty = legacy
+                                        logInfo("Subscribed legacy batch (wsId=$subId, ${legacyTriggers.size} trigger(s))")
+                                    }
                                 }
 
                             }
@@ -323,9 +351,15 @@ class HaWebSocketService : Service(), BaseLogger {
                                                 val trigger = ev.variables["trigger"] ?: return
 
                                                 if(trigger.platform == "state"){
-                                                    logVerbose("State change detected: ${trigger.entity_id}, ${trigger.to_state.state}")
+                                                    val wsId = envelope.id
+                                                    if (wsId == null || !wsSubIdToTriggerId.containsKey(wsId)) {
+                                                        logVerbose("Ignoring state event for unknown/stale wsId=$wsId")
+                                                        return
+                                                    }
+                                                    val triggerId = wsSubIdToTriggerId[wsId]?.takeIf { it.isNotEmpty() }
+                                                    logVerbose("State change detected: ${trigger.entity_id}, ${trigger.to_state.state}, triggerId=$triggerId")
                                                     val triggerJson = json.encodeToString(trigger)
-                                                    this@HaWebSocketService.triggerOnTriggerStateEvent2(triggerJson)
+                                                    this@HaWebSocketService.triggerOnTriggerStateEvent2(triggerJson, triggerId)
                                                 }
 
                                             }
@@ -429,26 +463,97 @@ class HaWebSocketService : Service(), BaseLogger {
         encodeDefaults = true
         prettyPrint = false
     }
-    private fun loadTriggerStateSubs(): List<StateTrigger> {
+    private fun doResubscribeTriggers() {
+        val ws = webSocket
+        if (ws == null) {
+            logInfo("doResubscribeTriggers: no active WebSocket, will subscribe on next connect")
+            return
+        }
+
+        serviceScope.launch {
+            try {
+                // Clear active map — old zombie subscriptions on HA side will still fire events
+                // but their IDs are no longer in the map, so they are silently ignored.
+                wsSubIdToTriggerId.clear()
+
+                val (perIdGroups, legacyTriggers) = loadTriggerStateSubs()
+                if (perIdGroups.isEmpty() && legacyTriggers.isEmpty()) {
+                    logInfo("doResubscribeTriggers: no triggers in prefs, not resubscribing")
+                    return@launch
+                }
+
+                for ((triggerId, triggers) in perIdGroups) {
+                    val subId = messageIdCounter.incrementAndGet()
+                    val req = SubscribeTriggerRequest(
+                        type = "subscribe_trigger",
+                        id = subId,
+                        trigger = triggers
+                    )
+                    ws.send(payloadJson.encodeToString(req))
+                    wsSubIdToTriggerId[subId] = triggerId
+                    logInfo("Resubscribed triggerId=$triggerId (wsId=$subId, ${triggers.size} entity/ies)")
+                }
+
+                if (legacyTriggers.isNotEmpty()) {
+                    val subId = messageIdCounter.incrementAndGet()
+                    val req = SubscribeTriggerRequest(
+                        type = "subscribe_trigger",
+                        id = subId,
+                        trigger = legacyTriggers
+                    )
+                    ws.send(payloadJson.encodeToString(req))
+                    wsSubIdToTriggerId[subId] = "" // empty = legacy
+                    logInfo("Resubscribed legacy batch (wsId=$subId, ${legacyTriggers.size} trigger(s))")
+                }
+
+            } catch (t: Throwable) {
+                logError("doResubscribeTriggers failed", t)
+            }
+        }
+    }
+
+    data class TriggerSubGroups(
+        val perIdGroups: Map<String, List<StateTrigger>>,
+        val legacyTriggers: List<StateTrigger>
+    )
+
+    private fun loadTriggerStateSubs(): TriggerSubGroups {
         val prefs = applicationContext.getSharedPreferences("TriggerStatePrefs", Context.MODE_PRIVATE)
         val items = prefs.getStringSet("items", emptySet()) ?: emptySet()
 
-        return items.mapNotNull { raw ->
+        val perIdGroups = mutableMapOf<String, MutableList<StateTrigger>>()
+        val legacyTriggers = mutableListOf<StateTrigger>()
+
+        for (raw in items) {
             runCatching {
                 val built = payloadJson.decodeFromString<OnTriggerStateBuiltForm>(raw)
 
-                val entity = built.entityId.trim()
-                if (entity.isBlank()) return@runCatching null
+                val effectiveIds = if (built.entityIds.isNotEmpty()) {
+                    built.entityIds.map { it.trim() }.filter { it.isNotBlank() }
+                } else {
+                    listOf(built.entityId.trim()).filter { it.isNotBlank() }
+                }
 
-                StateTrigger(
-                    platform = "state",
-                    entity_id = entity,
-                    from = built.fromState.trim().takeIf { it.isNotBlank() },
-                    to = built.toState.trim().takeIf { it.isNotBlank() },
-                    for_ = parseForDuration(built.forDuration)
-                )
-            }.getOrNull()
+                val stateTriggers = effectiveIds.map { entity ->
+                    StateTrigger(
+                        platform = "state",
+                        entity_id = entity,
+                        from = built.fromState.trim().takeIf { it.isNotBlank() },
+                        to = built.toState.trim().takeIf { it.isNotBlank() },
+                        for_ = parseForDuration(built.forDuration)
+                    )
+                }
+
+                val tid = built.triggerId
+                if (tid != null) {
+                    perIdGroups.getOrPut(tid) { mutableListOf() }.addAll(stateTriggers)
+                } else {
+                    legacyTriggers.addAll(stateTriggers)
+                }
+            }
         }
+
+        return TriggerSubGroups(perIdGroups, legacyTriggers)
     }
 
     private fun parseForDuration(forDuration: String): HaForDuration {

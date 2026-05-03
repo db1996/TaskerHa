@@ -47,37 +47,65 @@ class OnTriggerStateRunner :
         val eventFor = wsForToDurationString(envelope.for_)
         update.forDuration = eventFor
 
+        // UUID fast-path: when both sides have a triggerId, only ID equality matters.
+        // HA already applied entity/state/for filters when it fired the trigger.
+        val eventTriggerId = update.triggerId
+        val configTriggerId = config.triggerId.takeIf { it.isNotBlank() }
+        if (eventTriggerId != null && configTriggerId != null) {
+            return if (eventTriggerId == configTriggerId) {
+                CustomLogger.i("OnTriggerStateRunner", "UUID match fired: entity=${update.entityId}, triggerId=$configTriggerId")
+                TaskerPluginResultConditionSatisfied(context, update)
+            } else {
+                TaskerPluginResultConditionUnsatisfied()
+            }
+        }
+
         fun matches(configVal: String, eventVal: String?): Boolean {
             if (configVal.isBlank()) return true
             if (eventVal == null) return false
             return configVal == eventVal
         }
         fun matchesFor(configVal: String, eventVal: String): Boolean {
-            // blank means "ignore"
             if (configVal.isBlank()) return true
             return configVal.trim() == eventVal
         }
-        if(update.entityId != null && config.entityId != ""){
-            if (!matches(config.entityId.trim(), update.entityId)) {
+
+        // Build effective entity list: prefer multi-entity field, fall back to legacy single field
+        val multiIds = config.entityIds
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        val effectiveIds = if (multiIds.isNotEmpty()) {
+            multiIds
+        } else {
+            listOf(config.entityId.trim()).filter { it.isNotBlank() }
+        }
+
+        // Populate output entityIds (comma-separated)
+        update.entityIds = effectiveIds.joinToString(",")
+
+        if (effectiveIds.isNotEmpty()) {
+            // Entity filter: event entity must be in the configured list
+            if (update.entityId == null || update.entityId !in effectiveIds) {
                 return TaskerPluginResultConditionUnsatisfied()
             }
 
-            if(update.fromState != null){
+            if (update.fromState != null) {
                 if (!matches(config.fromState.trim(), update.fromState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
-            }else{
-                if(config.toState.isNotBlank()) {
+            } else {
+                if (config.fromState.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
 
-            if(update.toState != null) {
+            if (update.toState != null) {
                 if (!matches(config.toState.trim(), update.toState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
-            }else{
-                if(config.toState.isNotBlank()) {
+            } else {
+                if (config.toState.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }

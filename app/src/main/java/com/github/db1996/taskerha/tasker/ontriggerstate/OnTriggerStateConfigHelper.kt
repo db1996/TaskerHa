@@ -13,11 +13,12 @@ class OnTriggerStateConfigHelper(
     override val inputClass = OnTriggerStateInput::class.java
     override val outputClass = OnTriggerStateOutput::class.java
 }
-fun Context.triggerOnTriggerStateEvent2(rawJson: String) {
+fun Context.triggerOnTriggerStateEvent2(rawJson: String, triggerId: String? = null) {
     ActivityConfigOnTriggerState::class.java.requestQuery(
         this,
         OnTriggerStateOutput(
-            rawJson = rawJson
+            rawJson = rawJson,
+            triggerId = triggerId
         )
     )
 }
