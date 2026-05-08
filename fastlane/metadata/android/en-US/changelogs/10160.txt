@@ -1,0 +1,2 @@
+- Assign attributes to tasker trigger profile variables
+- Fixed some autostart issues
