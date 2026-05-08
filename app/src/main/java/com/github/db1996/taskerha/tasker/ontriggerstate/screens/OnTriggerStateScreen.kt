@@ -167,28 +167,37 @@ fun OnTriggerStateScreen(
                 )
 
                 OutlinedButton(
-                    onClick = { viewModel.loadAttributesForFirstEntity() },
+                    onClick = { viewModel.loadAttributesForAllEntities() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Load attributes from entity")
+                    Text("Load attributes from entities")
                 }
 
                 if (viewModel.isLoadingAttributes) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                 }
 
-                // Rows for loaded attributes
-                viewModel.availableAttributes.forEach { attrKey ->
-                    AttributeSlotRow(
-                        attrKey = attrKey,
-                        currentSlot = form.attributeMapping[attrKey],
-                        onSlotSelected = { slot -> viewModel.setAttributeSlot(attrKey, slot) }
+                // Per-entity attribute rows with a header for each entity
+                val allLoadedKeys = viewModel.availableAttributes.values.flatten().toSet()
+                viewModel.availableAttributes.forEach { (entityId, attrKeys) ->
+                    Text(
+                        text = entityId,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp)
                     )
+                    attrKeys.forEach { attrKey ->
+                        AttributeSlotRow(
+                            attrKey = attrKey,
+                            currentSlot = form.attributeMapping[attrKey],
+                            onSlotSelected = { slot -> viewModel.setAttributeSlot(attrKey, slot) }
+                        )
+                    }
                 }
 
                 // Show already-mapped keys not yet loaded (restored from prefs)
                 val unmappedSavedKeys = form.attributeMapping.keys
-                    .filter { it !in viewModel.availableAttributes }
+                    .filter { it !in allLoadedKeys }
                 if (unmappedSavedKeys.isNotEmpty()) {
                     Text(
                         text = "Saved mappings (press Load to refresh):",

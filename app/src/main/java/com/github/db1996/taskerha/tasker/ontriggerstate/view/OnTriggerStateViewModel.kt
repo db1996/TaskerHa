@@ -24,7 +24,7 @@ class OnTriggerStateViewModel(
 
     var currentDomainSearch: String by mutableStateOf("")
 
-    var availableAttributes: List<String> by mutableStateOf(emptyList())
+    var availableAttributes: Map<String, List<String>> by mutableStateOf(emptyMap())
         private set
 
     var isLoadingAttributes: Boolean by mutableStateOf(false)
@@ -77,16 +77,20 @@ class OnTriggerStateViewModel(
         form = form.copy(attributeMapping = updated)
     }
 
-    fun loadAttributesForFirstEntity() {
-        val entityId = form.entityIds.firstOrNull()?.takeIf { it.isNotBlank() }
-            ?: form.entityId.takeIf { it.isNotBlank() }
-            ?: return
+    fun loadAttributesForAllEntities() {
+        val entityIds = form.entityIds.filter { it.isNotBlank() }
+            .ifEmpty { listOf(form.entityId).filter { it.isNotBlank() } }
+        if (entityIds.isEmpty()) return
         isLoadingAttributes = true
         launchClientOperation { client ->
-            val keys = client.getEntityAttributeKeys(entityId)
-            availableAttributes = keys
+            val result = mutableMapOf<String, List<String>>()
+            for (entityId in entityIds) {
+                val keys = client.getEntityAttributeKeys(entityId)
+                if (keys.isNotEmpty()) result[entityId] = keys
+                logDebug("Loaded attributes for $entityId: ${keys.size}")
+            }
+            availableAttributes = result
             isLoadingAttributes = false
-            logDebug("Loaded attributes for $entityId: ${keys.size}")
         }
     }
 
