@@ -7,5 +7,6 @@ data class ActualService(
     val type: String,
     val domain: String,
     val fields: MutableList<HaServiceField>,
-    val targetEntity: Boolean
+    val targetEntity: Boolean,
+    val broadEntityTarget: Boolean = false
 )

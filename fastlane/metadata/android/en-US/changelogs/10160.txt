@@ -1,2 +1,3 @@
 - Assign attributes to tasker trigger profile variables
 - Fixed some autostart issues
+- Fixed some core actions that can handle entities

@@ -313,7 +313,14 @@ class HomeAssistantClient(
 
     // --- Conversions
     private fun convertService(haService: HaService, serviceId: String, domain: String): ActualService {
-        val hasEntityTarget = haService.target?.containsKey("entity") ?: false
+        var hasEntityTarget = haService.target?.containsKey("entity") ?: false
+        if(haService.target?.isEmpty() ?: false){
+            // This means the target can be entity,device, areas and labels. So allow entity
+            hasEntityTarget = true
+        }
+
+        val broadTarget = haService.target?.isEmpty() ?: false
+
         val actualService = ActualService(
             id = serviceId,
             name = haService.name,
@@ -321,7 +328,8 @@ class HomeAssistantClient(
             type = domain,
             domain = domain,
             fields = mutableListOf(),
-            targetEntity = hasEntityTarget
+            targetEntity = hasEntityTarget,
+            broadEntityTarget = broadTarget,
         )
 
 

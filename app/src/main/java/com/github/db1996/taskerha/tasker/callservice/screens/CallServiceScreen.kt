@@ -91,7 +91,7 @@ fun CallServiceScreen(
                     }
                     EntitySelector(
                         entities = viewModel.entities,
-                        serviceDomain = service.domain,
+                        serviceDomain = if (service.broadEntityTarget) "" else service.domain,
                         currentEntityId = form.entityId,
                         searching = entitySearching,
                         onSearchChanged = { entitySearching = it },
