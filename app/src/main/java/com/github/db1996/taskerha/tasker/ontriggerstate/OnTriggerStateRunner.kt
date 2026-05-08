@@ -2,7 +2,6 @@ package com.github.db1996.taskerha.tasker.ontriggerstate
 
 import android.content.Context
 import com.github.db1996.taskerha.logging.CustomLogger
-import com.github.db1996.taskerha.service.data.OnTriggerStateEnvelope
 import com.github.db1996.taskerha.service.data.OnTriggerStateTriggerWsData
 import com.github.db1996.taskerha.service.data.OnTriggerStateWsTriggerFor
 import com.joaomgcd.taskerpluginlibrary.condition.TaskerPluginRunnerConditionEvent
@@ -10,7 +9,11 @@ import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionSatisfied
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionUnsatisfied
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 class OnTriggerStateRunner :
     TaskerPluginRunnerConditionEvent<
@@ -46,6 +49,37 @@ class OnTriggerStateRunner :
         update.attributesJson = attrsJson
         val eventFor = wsForToDurationString(envelope.for_)
         update.forDuration = eventFor
+
+        // Populate ha_attr_1..10 from the configured attribute mapping
+        val mappingJson = config.attributeMappingJson
+        if (mappingJson.isNotBlank() && mappingJson != "{}") {
+            val mapping = try {
+                json.decodeFromString(
+                    MapSerializer(String.serializer(), Int.serializer()),
+                    mappingJson
+                )
+            } catch (_: Exception) {
+                emptyMap()
+            }
+            val attrs = envelope.to_state.attributes
+            for ((attrKey, slot) in mapping) {
+                val value = attrs[attrKey]?.let { el ->
+                    (el as? JsonPrimitive)?.contentOrNull ?: el.toString()
+                }
+                when (slot) {
+                    1 -> update.haAttr1 = value
+                    2 -> update.haAttr2 = value
+                    3 -> update.haAttr3 = value
+                    4 -> update.haAttr4 = value
+                    5 -> update.haAttr5 = value
+                    6 -> update.haAttr6 = value
+                    7 -> update.haAttr7 = value
+                    8 -> update.haAttr8 = value
+                    9 -> update.haAttr9 = value
+                    10 -> update.haAttr10 = value
+                }
+            }
+        }
 
         // UUID fast-path: when both sides have a triggerId, only ID equality matters.
         // HA already applied entity/state/for filters when it fired the trigger.

@@ -11,7 +11,8 @@ data class OnTriggerStateForm(
     var entityIds: List<String> = emptyList(),
     var fromState: String = "",
     var toState: String = "",
-    var forDuration: String = ""
+    var forDuration: String = "",
+    var attributeMapping: Map<String, Int> = emptyMap()
 )
 
 val json = Json {
@@ -28,7 +29,8 @@ data class OnTriggerStateBuiltForm(
     val fromState: String = "",
     val toState: String = "",
     val forDuration: String = "",
-    val triggerId: String? = null
+    val triggerId: String? = null,
+    val attributeMapping: Map<String, Int> = emptyMap()
 ) : SavePrefsJson {
     override fun prefsName(): String = "TriggerStatePrefs"
 

@@ -158,6 +158,10 @@ fun MainSettingsScreen(
                                 HaSettings.saveClientCertEnabled(context, clientCertEnabled)
                                 HaSettings.saveClientCertAlias(context, clientCertAlias)
                                 setSaved()
+                                if (wsEnabled) {
+                                    HaWebSocketService.stop(context)
+                                    HaWebSocketService.start(context)
+                                }
                             }
                         ) {
                             if (saved) {
@@ -301,7 +305,7 @@ fun MainSettingsScreen(
     // Battery dialog stays global because it can be triggered from the websocket tab
     if (showBatteryDialog) {
         AlertDialog(
-            onDismissRequest = { showBatteryDialog = false },
+            onDismissRequest = { },
             title = { Text("Allow background activity") },
             text = {
                 Text(
@@ -314,7 +318,6 @@ fun MainSettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showBatteryDialog = false
                         setBatteryDialogShown(context)
                         openAppBatterySettings(context)
                         wsEnabled = true
@@ -326,7 +329,6 @@ fun MainSettingsScreen(
             dismissButton = {
                 TextButton(
                     onClick = {
-                        showBatteryDialog = false
                         wsEnabled = false
                         HaSettings.saveWebSocketEnabled(context, false)
                         HaWebSocketService.stop(context)
@@ -458,7 +460,6 @@ private fun LocalUrlSection(
                 Toast.LENGTH_LONG
             ).show()
         }
-        pendingAction = null
     }
 
     fun withLocationPermission(action: () -> Unit) {
@@ -555,7 +556,6 @@ private fun LocalUrlSection(
         enabled = !detecting,
         onClick = {
             withLocationPermission {
-                detecting = true
                 scope.launch {
                     // The long-lived NetworkCallback may not have fired yet
                     // (especially if monitoring just started). Poll the cache
@@ -567,7 +567,6 @@ private fun LocalUrlSection(
                         currentSsid = NetworkHelper.getCurrentSsid()
                         attempts++
                     }
-                    detecting = false
                     if (currentSsid != null) {
                         onHomeSsidsChange(homeSsids + currentSsid)
                     } else {
@@ -777,7 +776,7 @@ private fun LogLevelDropdown(
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
+        onExpandedChange = { !expanded }
     ) {
         OutlinedTextField(
             modifier = Modifier
@@ -791,7 +790,7 @@ private fun LogLevelDropdown(
 
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { }
         ) {
             options.forEach { lvl ->
                 DropdownMenuItem(
@@ -802,7 +801,6 @@ private fun LogLevelDropdown(
                         }
                     },
                     onClick = {
-                        expanded = false
                         onChange(lvl)
                     }
                 )

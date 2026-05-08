@@ -108,7 +108,7 @@ class HomeAssistantClient(
             .header("Authorization", "Bearer $accessToken")
             .build()
 
-    private fun request(path: String, method: String, body: String?): Request {
+    private fun request(path: String, body: String?, method: String = "POST"): Request {
         val requestBody = body?.toRequestBody("application/json".toMediaType())
         return Request.Builder()
             .url("$baseUrl$path")
@@ -224,7 +224,19 @@ class HomeAssistantClient(
             }
         }
 
-
+    suspend fun getEntityAttributeKeys(entityId: String): List<String> =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext emptyList()
+            try {
+                val response = http.newCall(request("/api/states/$entityId")).execute()
+                val body = response.body?.string()
+                if (!response.isSuccessful || body == null) return@withContext emptyList()
+                val detail = json.decodeFromString<com.github.db1996.taskerha.datamodels.HaEntityStateDetail>(body)
+                detail.attributes.keys.toList()
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
 
     suspend fun callService(domain: String, service: String, entityId: String, data: Map<String, Any>? = null): Boolean =
         withContext(Dispatchers.IO) {
@@ -237,11 +249,11 @@ class HomeAssistantClient(
             logVerbose("Payload: $payload")
 
             val body = json.encodeToString(
-                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
+                MapSerializer(String.serializer(), JsonElement.serializer()),
                 payload.mapValues { JsonPrimitive(it.value.toString()) }
             )
 
-            val req = request("/api/services/$domain/$service", "POST", body)
+            val req = request("/api/services/$domain/$service", body)
             logVerbose("url: ${req.url}")
 
             try {
@@ -274,11 +286,11 @@ class HomeAssistantClient(
 
 
             val body = json.encodeToString(
-                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
+                MapSerializer(String.serializer(), JsonElement.serializer()),
                 payload.mapValues { JsonPrimitive(it.value.toString()) }
             )
 
-            val req = request("/api/events/$eventType", "POST", body)
+            val req = request("/api/events/$eventType", body)
             logVerbose("url: ${req.url}")
             try {
                 val response = http.newCall(req).execute()
@@ -330,7 +342,6 @@ class HomeAssistantClient(
                 is JsonPrimitive -> fieldData.example = element.contentOrNull
                 is JsonArray -> fieldData.example = element.joinToString(", ") { it.toString() }
                 is JsonObject -> fieldData.example = element.toString()
-                else -> fieldData.example = null
             }
         }
 

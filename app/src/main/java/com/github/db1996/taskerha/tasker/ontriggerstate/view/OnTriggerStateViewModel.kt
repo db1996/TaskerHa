@@ -24,6 +24,12 @@ class OnTriggerStateViewModel(
 
     var currentDomainSearch: String by mutableStateOf("")
 
+    var availableAttributes: List<String> by mutableStateOf(emptyList())
+        private set
+
+    var isLoadingAttributes: Boolean by mutableStateOf(false)
+        private set
+
 
     override val logTag: String
         get() =  "OnTriggerStateViewModel"
@@ -32,9 +38,9 @@ class OnTriggerStateViewModel(
         get() = LogChannel.WEBSOCKET
 
     // UI event handlers
-    fun pickEntity(entityId: String) {
-        form = form.copy(entityId = entityId)
-    }
+//    fun pickEntity(entityId: String) {
+//        form = form.copy(entityId = entityId)
+//    }
 
     fun addEntity(entityId: String) {
         val trimmed = entityId.trim()
@@ -65,6 +71,25 @@ class OnTriggerStateViewModel(
         form = form.copy(forDuration = forDuration)
     }
 
+    fun setAttributeSlot(attrKey: String, slot: Int?) {
+        val updated = form.attributeMapping.toMutableMap()
+        if (slot == null) updated.remove(attrKey) else updated[attrKey] = slot
+        form = form.copy(attributeMapping = updated)
+    }
+
+    fun loadAttributesForFirstEntity() {
+        val entityId = form.entityIds.firstOrNull()?.takeIf { it.isNotBlank() }
+            ?: form.entityId.takeIf { it.isNotBlank() }
+            ?: return
+        isLoadingAttributes = true
+        launchClientOperation { client ->
+            val keys = client.getEntityAttributeKeys(entityId)
+            availableAttributes = keys
+            isLoadingAttributes = false
+            logDebug("Loaded attributes for $entityId: ${keys.size}")
+        }
+    }
+
     override fun buildForm(): OnTriggerStateBuiltForm {
         val blurb = when {
             form.entityIds.isNotEmpty() -> "Get state: ${form.entityIds.joinToString(", ")}"
@@ -78,7 +103,8 @@ class OnTriggerStateViewModel(
             toState = form.toState,
             blurb = blurb,
             forDuration = form.forDuration,
-            triggerId = UUID.randomUUID().toString()
+            triggerId = UUID.randomUUID().toString(),
+            attributeMapping = form.attributeMapping
         )
     }
 
@@ -95,7 +121,8 @@ class OnTriggerStateViewModel(
             entityIds = migratedIds,
             fromState = data.fromState,
             toState = data.toState,
-            forDuration = data.forDuration
+            forDuration = data.forDuration,
+            attributeMapping = data.attributeMapping
         )
     }
 

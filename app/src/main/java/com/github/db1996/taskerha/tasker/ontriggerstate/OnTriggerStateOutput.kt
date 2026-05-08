@@ -39,5 +39,45 @@ class OnTriggerStateOutput @JvmOverloads constructor(
     var entityIds: String? = null,
 
     @field:TaskerInputField("triggerId")
-    var triggerId: String? = null
+    var triggerId: String? = null,
+
+    @field:TaskerInputField("haAttr1")
+    @get:TaskerOutputVariable("ha_attr_1", labelResIdName = "ha_on_trigger_attr_1_label")
+    var haAttr1: String? = null,
+
+    @field:TaskerInputField("haAttr2")
+    @get:TaskerOutputVariable("ha_attr_2", labelResIdName = "ha_on_trigger_attr_2_label")
+    var haAttr2: String? = null,
+
+    @field:TaskerInputField("haAttr3")
+    @get:TaskerOutputVariable("ha_attr_3", labelResIdName = "ha_on_trigger_attr_3_label")
+    var haAttr3: String? = null,
+
+    @field:TaskerInputField("haAttr4")
+    @get:TaskerOutputVariable("ha_attr_4", labelResIdName = "ha_on_trigger_attr_4_label")
+    var haAttr4: String? = null,
+
+    @field:TaskerInputField("haAttr5")
+    @get:TaskerOutputVariable("ha_attr_5", labelResIdName = "ha_on_trigger_attr_5_label")
+    var haAttr5: String? = null,
+
+    @field:TaskerInputField("haAttr6")
+    @get:TaskerOutputVariable("ha_attr_6", labelResIdName = "ha_on_trigger_attr_6_label")
+    var haAttr6: String? = null,
+
+    @field:TaskerInputField("haAttr7")
+    @get:TaskerOutputVariable("ha_attr_7", labelResIdName = "ha_on_trigger_attr_7_label")
+    var haAttr7: String? = null,
+
+    @field:TaskerInputField("haAttr8")
+    @get:TaskerOutputVariable("ha_attr_8", labelResIdName = "ha_on_trigger_attr_8_label")
+    var haAttr8: String? = null,
+
+    @field:TaskerInputField("haAttr9")
+    @get:TaskerOutputVariable("ha_attr_9", labelResIdName = "ha_on_trigger_attr_9_label")
+    var haAttr9: String? = null,
+
+    @field:TaskerInputField("haAttr10")
+    @get:TaskerOutputVariable("ha_attr_10", labelResIdName = "ha_on_trigger_attr_10_label")
+    var haAttr10: String? = null
 )

@@ -23,4 +23,7 @@ class OnTriggerStateInput {
 
     @field:TaskerInputField("triggerId")
     var triggerId: String = ""
+
+    @field:TaskerInputField("attributeMappingJson")
+    var attributeMappingJson: String = "{}"
 }
