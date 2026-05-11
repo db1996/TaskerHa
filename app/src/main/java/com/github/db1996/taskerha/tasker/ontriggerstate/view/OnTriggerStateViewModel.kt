@@ -8,6 +8,7 @@ import com.github.db1996.taskerha.datamodels.HaEntity
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
+import com.github.db1996.taskerha.tasker.ontriggerstate.data.EntityTriggerConfig
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
 import java.util.UUID
@@ -45,30 +46,73 @@ class OnTriggerStateViewModel(
     fun addEntity(entityId: String) {
         val trimmed = entityId.trim()
         if (trimmed.isNotBlank() && trimmed !in form.entityIds) {
-            form = form.copy(entityIds = form.entityIds + trimmed)
+            form = form.copy(
+                entityIds = form.entityIds + trimmed,
+                entityConfigs = form.entityConfigs + EntityTriggerConfig(entityId = trimmed)
+            )
         }
     }
 
     fun removeEntity(index: Int) {
-        form = form.copy(entityIds = form.entityIds.toMutableList().also { it.removeAt(index) })
+        form = form.copy(
+            entityIds = form.entityIds.toMutableList().also { it.removeAt(index) },
+            entityConfigs = form.entityConfigs.toMutableList().also {
+                if (index < it.size) it.removeAt(index)
+            }
+        )
     }
 
     fun updateEntityAt(index: Int, value: String) {
-        val updated = form.entityIds.toMutableList()
-        updated[index] = value
-        form = form.copy(entityIds = updated)
+        val updatedIds = form.entityIds.toMutableList()
+        updatedIds[index] = value
+        val updatedConfigs = form.entityConfigs.toMutableList()
+        if (index < updatedConfigs.size) {
+            updatedConfigs[index] = updatedConfigs[index].copy(entityId = value)
+        }
+        form = form.copy(entityIds = updatedIds, entityConfigs = updatedConfigs)
     }
 
-    fun setFrom(fromState: String) {
-        form = form.copy(fromState = fromState)
+    private fun updateConfig(index: Int, update: (EntityTriggerConfig) -> EntityTriggerConfig) {
+        val updated = form.entityConfigs.toMutableList()
+        if (index < updated.size) updated[index] = update(updated[index])
+        form = form.copy(entityConfigs = updated)
     }
 
-    fun setTo(toState: String) {
-        form = form.copy(toState = toState)
+    fun setFrom(index: Int, fromState: String) = updateConfig(index) { it.copy(fromState = fromState) }
+    fun setTo(index: Int, toState: String) = updateConfig(index) { it.copy(toState = toState) }
+    fun setFor(index: Int, forDuration: String) = updateConfig(index) { it.copy(forDuration = forDuration) }
+    fun setTargetAttribute(index: Int, value: String) = updateConfig(index) { it.copy(targetAttribute = value) }
+    fun setIgnoreMainStateChanges(index: Int, value: Boolean) = updateConfig(index) { it.copy(ignoreMainStateChanges = value) }
+
+    private fun updateSharedConfig(update: (EntityTriggerConfig) -> EntityTriggerConfig) {
+        form = form.copy(sharedConfig = update(form.sharedConfig))
     }
 
-    fun setFor(forDuration: String){
-        form = form.copy(forDuration = forDuration)
+    fun setSharedFrom(value: String) = updateSharedConfig { it.copy(fromState = value) }
+    fun setSharedTo(value: String) = updateSharedConfig { it.copy(toState = value) }
+    fun setSharedFor(value: String) = updateSharedConfig { it.copy(forDuration = value) }
+    fun setSharedTargetAttribute(value: String) = updateSharedConfig { it.copy(targetAttribute = value) }
+    fun setSharedIgnoreMainStateChanges(value: Boolean) = updateSharedConfig { it.copy(ignoreMainStateChanges = value) }
+
+    fun setConfigPerEntity(value: Boolean) {
+        if (value) {
+            // Pre-fill entityConfigs from sharedConfig when switching to per-entity mode
+            val shared = form.sharedConfig
+            val newConfigs = form.entityIds.mapIndexed { i, id ->
+                form.entityConfigs.getOrNull(i)?.copy(entityId = id)
+                    ?: EntityTriggerConfig(
+                        entityId = id,
+                        fromState = shared.fromState,
+                        toState = shared.toState,
+                        forDuration = shared.forDuration,
+                        targetAttribute = shared.targetAttribute,
+                        ignoreMainStateChanges = shared.ignoreMainStateChanges
+                    )
+            }
+            form = form.copy(configPerEntity = true, entityConfigs = newConfigs)
+        } else {
+            form = form.copy(configPerEntity = false)
+        }
     }
 
     fun setAttributeSlot(attrKey: String, slot: Int?) {
@@ -103,29 +147,58 @@ class OnTriggerStateViewModel(
         return OnTriggerStateBuiltForm(
             entityId = "",
             entityIds = form.entityIds,
-            fromState = form.fromState,
-            toState = form.toState,
+            entityConfigs = form.entityConfigs,
+            sharedConfig = form.sharedConfig,
+            configPerEntity = form.configPerEntity,
+            version = 1,
             blurb = blurb,
-            forDuration = form.forDuration,
+            fromState = "",
+            toState = "",
+            forDuration = "",
             triggerId = UUID.randomUUID().toString(),
             attributeMapping = form.attributeMapping
         )
     }
 
     override fun restoreForm(data: OnTriggerStateBuiltForm) {
-        logVerbose("Restoring form: entityId=${data.entityId}, entityIds=${data.entityIds}, fromState=${data.fromState}, toState=${data.toState}")
+        logVerbose("Restoring form: entityId=${data.entityId}, entityIds=${data.entityIds}, version=${data.version}, configPerEntity=${data.configPerEntity}")
         // Migrate legacy single entityId into the multi-entity list
         val migratedIds = if (data.entityIds.isEmpty() && data.entityId.isNotBlank()) {
             listOf(data.entityId.trim())
         } else {
             data.entityIds
         }
+
+        // v0 migration: restore shared config from old top-level fields
+        val restoredSharedConfig = if (data.version == 0) {
+            EntityTriggerConfig(
+                fromState = data.fromState,
+                toState = data.toState,
+                forDuration = data.forDuration
+            )
+        } else {
+            data.sharedConfig
+        }
+
+        // Ensure entityConfigs is in sync with entityIds
+        val restoredConfigs = if (data.configPerEntity) {
+            migratedIds.mapIndexed { i, id ->
+                data.entityConfigs.getOrNull(i)?.copy(entityId = id)
+                    ?: EntityTriggerConfig(entityId = id)
+            }
+        } else {
+            migratedIds.map { id ->
+                data.entityConfigs.find { it.entityId == id }
+                    ?: EntityTriggerConfig(entityId = id)
+            }
+        }
+
         form = OnTriggerStateForm(
             entityId = data.entityId,
             entityIds = migratedIds,
-            fromState = data.fromState,
-            toState = data.toState,
-            forDuration = data.forDuration,
+            entityConfigs = restoredConfigs,
+            sharedConfig = restoredSharedConfig,
+            configPerEntity = data.configPerEntity,
             attributeMapping = data.attributeMapping
         )
     }

@@ -26,4 +26,16 @@ class OnTriggerStateInput {
 
     @field:TaskerInputField("attributeMappingJson")
     var attributeMappingJson: String = "{}"
+
+    @field:TaskerInputField("targetAttribute")
+    var targetAttribute: String = ""
+
+    @field:TaskerInputField("ignoreMainStateChanges")
+    var ignoreMainStateChanges: String = ""
+
+    @field:TaskerInputField("version")
+    var version: String = ""
+
+    @field:TaskerInputField("configPerEntity")
+    var configPerEntity: String = ""
 }

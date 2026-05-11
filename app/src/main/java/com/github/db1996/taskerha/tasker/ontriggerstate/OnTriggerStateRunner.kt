@@ -81,6 +81,61 @@ class OnTriggerStateRunner :
             }
         }
 
+        // Build effective entity list
+        val multiIds = config.entityIds
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        val effectiveIds = multiIds.ifEmpty {
+            listOf(config.entityId.trim()).filter { it.isNotBlank() }
+        }
+
+        // Populate output entityIds (comma-separated)
+        update.entityIds = effectiveIds.joinToString(",")
+
+        // Find per-entity index for the event entity
+        val entityIndex = if (effectiveIds.isNotEmpty()) effectiveIds.indexOf(update.entityId) else -1
+
+        // Resolve per-entity filter values based on configPerEntity flag
+        val configPerEntity = config.configPerEntity.trim().lowercase() == "true"
+        val entityFrom: String
+        val entityTo: String
+        val entityFor: String
+        val targetAttr: String
+        val ignoreMain: Boolean
+
+        if (configPerEntity) {
+            fun splitPerEntity(raw: String): List<String> = raw.split("|;")
+            val fromList   = splitPerEntity(config.fromState)
+            val toList     = splitPerEntity(config.toState)
+            val forList    = splitPerEntity(config.forDuration)
+            val attrList   = splitPerEntity(config.targetAttribute)
+            val ignoreList = splitPerEntity(config.ignoreMainStateChanges)
+            entityFrom = if (entityIndex >= 0) fromList.getOrElse(entityIndex) { "" } else ""
+            entityTo   = if (entityIndex >= 0) toList.getOrElse(entityIndex) { "" } else ""
+            entityFor  = if (entityIndex >= 0) forList.getOrElse(entityIndex) { "" } else ""
+            targetAttr = if (entityIndex >= 0) attrList.getOrElse(entityIndex) { "" }.trim() else ""
+            ignoreMain = if (entityIndex >= 0) ignoreList.getOrElse(entityIndex) { "false" }.trim().lowercase() == "true" else false
+        } else {
+            // All-entities mode: single shared values apply to every entity
+            entityFrom = config.fromState
+            entityTo   = config.toState
+            entityFor  = config.forDuration
+            targetAttr = config.targetAttribute.trim()
+            ignoreMain = config.ignoreMainStateChanges.trim().lowercase() == "true"
+        }
+
+        // ignoreMainStateChanges: only proceed if the target attribute actually changed
+        if (ignoreMain && targetAttr.isNotBlank()) {
+            val fromAttrValue = envelope.from_state.attributes[targetAttr]?.toString()
+            val toAttrValue   = envelope.to_state.attributes[targetAttr]?.toString()
+            if (fromAttrValue == toAttrValue) {
+                CustomLogger.d("OnTriggerStateRunner", "Skipping: ignoreMainStateChanges=true, attribute '$targetAttr' unchanged ($fromAttrValue)")
+                return TaskerPluginResultConditionUnsatisfied()
+            }
+            CustomLogger.d("OnTriggerStateRunner", "Attribute '$targetAttr' changed: from=$fromAttrValue, to=$toAttrValue")
+        }
+
         // UUID fast-path: when both sides have a triggerId, only ID equality matters.
         // HA already applied entity/state/for filters when it fired the trigger.
         val eventTriggerId = update.triggerId
@@ -104,20 +159,6 @@ class OnTriggerStateRunner :
             return configVal.trim() == eventVal
         }
 
-        // Build effective entity list: prefer multi-entity field, fall back to legacy single field
-        val multiIds = config.entityIds
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        val effectiveIds = if (multiIds.isNotEmpty()) {
-            multiIds
-        } else {
-            listOf(config.entityId.trim()).filter { it.isNotBlank() }
-        }
-
-        // Populate output entityIds (comma-separated)
-        update.entityIds = effectiveIds.joinToString(",")
-
         if (effectiveIds.isNotEmpty()) {
             // Entity filter: event entity must be in the configured list
             if (update.entityId == null || update.entityId !in effectiveIds) {
@@ -125,26 +166,26 @@ class OnTriggerStateRunner :
             }
 
             if (update.fromState != null) {
-                if (!matches(config.fromState.trim(), update.fromState)) {
+                if (!matches(entityFrom, update.fromState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             } else {
-                if (config.fromState.isNotBlank()) {
+                if (entityFrom.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
 
             if (update.toState != null) {
-                if (!matches(config.toState.trim(), update.toState)) {
+                if (!matches(entityTo, update.toState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             } else {
-                if (config.toState.isNotBlank()) {
+                if (entityTo.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
 
-            if (!matchesFor(config.forDuration, eventFor)) {
+            if (!matchesFor(entityFor, eventFor)) {
                 return TaskerPluginResultConditionUnsatisfied()
             }
         }

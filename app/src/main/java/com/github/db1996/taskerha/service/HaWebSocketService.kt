@@ -534,13 +534,19 @@ class HaWebSocketService : Service(), BaseLogger {
                     listOf(built.entityId.trim()).filter { it.isNotBlank() }
                 }
 
-                val stateTriggers = effectiveIds.map { entity ->
+                val stateTriggers = effectiveIds.mapIndexed { index, entity ->
+                    val config = if (built.configPerEntity) {
+                        built.entityConfigs.getOrNull(index) ?: built.sharedConfig
+                    } else {
+                        built.sharedConfig
+                    }
                     StateTrigger(
                         platform = "state",
                         entity_id = entity,
-                        from = built.fromState.trim().takeIf { it.isNotBlank() },
-                        to = built.toState.trim().takeIf { it.isNotBlank() },
-                        for_ = parseForDuration(built.forDuration)
+                        from = config.fromState.trim().takeIf { it.isNotBlank() },
+                        to = config.toState.trim().takeIf { it.isNotBlank() },
+                        for_ = parseForDuration(config.forDuration),
+                        attribute = config.targetAttribute.trim().takeIf { it.isNotBlank() }
                     )
                 }
 

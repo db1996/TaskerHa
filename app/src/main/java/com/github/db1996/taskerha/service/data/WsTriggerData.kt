@@ -20,7 +20,9 @@ data class StateTrigger(
     val to: String?,
 
     @SerialName("for")
-    val for_: HaForDuration
+    val for_: HaForDuration,
+
+    val attribute: String? = null
 )
 
 @Serializable
