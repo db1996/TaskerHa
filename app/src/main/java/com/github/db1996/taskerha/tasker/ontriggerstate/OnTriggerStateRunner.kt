@@ -121,6 +121,14 @@ class OnTriggerStateRunner :
             targetAttr = config.targetAttribute.trim()
         }
 
+        // If targeting a specific attribute, expose its old/new value via ha_from/ha_to
+        if (targetAttr.isNotBlank()) {
+            fun attrStr(attrs: Map<String, kotlinx.serialization.json.JsonElement>, key: String): String? =
+                attrs[key]?.let { el -> (el as? JsonPrimitive)?.contentOrNull ?: el.toString() }
+            update.fromState = attrStr(envelope.from_state.attributes, targetAttr)
+            update.toState   = attrStr(envelope.to_state.attributes, targetAttr)
+        }
+
         // UUID fast-path: when both sides have a triggerId, only ID equality matters.
         // HA already applied entity/state/for filters when it fired the trigger.
         val eventTriggerId = update.triggerId

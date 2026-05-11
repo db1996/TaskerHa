@@ -8,7 +8,7 @@ TaskerHA lets you:
 
 - Call any Home Assistant service from a Tasker action
 - Read the state and attributes of any entity
-- Trigger Tasker profiles when an entity changes state over a websocket connection
+- Trigger Tasker profiles when an entity (or a specific attribute of an entity) changes state over a websocket connection
 - Send direct messages from HA to tasker and back with a custom event (uses websocket)
 
 
@@ -263,40 +263,68 @@ The following variables are available from within tasker after the action
 ### Trigger state change profile
 
 1. Create a new profile in Tasker: plugin -> taskerHa -> HA On trigger state
-2. In the configuration, there's an entity picker to search with. And you can filter by domain (fuzzy search).
-3. You can enter from and to fields to filter events based on the `old_state` and `new_state`. This works the same as a trigger in a Homeassistant automation (`for` is not possible right now)
+2. In the configuration, search and pick one or more entities using the entity picker (supports domain filtering and fuzzy search).
+3. Optionally configure **From**, **To**, and **For** fields to filter events — these work the same as the equivalent fields in a Home Assistant automation trigger.
+4. Optionally set a **Target attribute** to watch a specific attribute of the entity instead of its main state (e.g. `color_mode`, `brightness`). When set, HA will only fire the trigger when that attribute changes, and `%ha_from` / `%ha_to` will contain the old and new **attribute** value instead of the entity state.
 
-You can use tasker variables for the entity ID, from and to states, make sure to use the "%" for any variable use.
+You can use tasker variables for the entity ID, from/to states and for duration — make sure to use "%" for any variable.
 
-The websocket option in the main app has to be turned on for this. Oterwise it will never fire.
+The websocket option in the main app has to be turned on for this. Otherwise it will never fire.
 
-Any state change to the choosen element will fire the profile
+#### Multiple entities
 
-**Example**
+You can add multiple entities to a single profile. All entities are monitored over a single shared websocket subscription. When any of them fires, `%ha_entity` tells you which one triggered the profile.
+
+#### Config per entity
+
+By default ("All entities" mode) the From, To, For, and Target attribute settings apply to every entity in the list equally.
+
+Toggle **Config per entity** to configure each entity independently — each gets its own From, To, For, and Target attribute settings.
+
+#### Attribute variable mapping
+
+The **Attribute variable mapping** section lets you pin specific attribute values to the fixed Tasker variables `%ha_attr_1` through `%ha_attr_10`. This is useful when you want to reliably read an attribute in your task without having to parse `%ha_attrs` JSON every time.
+
+- Tap **Load attributes** to fetch the current attribute list for all configured entities from Home Assistant.
+- Attributes present on two or more entities appear under a **Shared** section; attributes unique to a single entity are listed under that entity.
+- Assign a slot number (1–10) to any attribute. After the profile fires, the corresponding `%ha_attr_N` variable will contain that attribute's value from the new state.
+
+**Examples**
 
 Run a Tasker task when the door opens:
 
 - Profile: Plugin -> TaskerHA -> HA On trigger state
 - Entity: `binary_sensor.front_door`
-- From: `off`
-- To: `on`
+- From: `off`, To: `on`
 
-Now any time the door opens, this profile will fire and you can run any Tasker task.
+React to a light's color mode changing:
+
+- Profile: Plugin -> TaskerHA -> HA On trigger state
+- Entity: `light.living_room`
+- Target attribute: `color_mode`
+- `%ha_from` will be the previous color mode (e.g. `color_temp`), `%ha_to` will be the new one (e.g. `xy`).
+
+Map brightness to a variable for easy use downstream:
+
+- Attribute variable mapping: `brightness` → slot 1
+- After the profile fires, `%ha_attr_1` contains the current brightness value.
 
 #### Response in tasker
 
-The following variables are available from within tasker after the action
+The following variables are available in Tasker when the profile fires.
 
-| Variable   | Function                                                                                                                                                                                                   |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| %ha_entity | Contains the entity_id of the choosen entity                                                                                                                                                               |
-| %ha_from   | Contains the old state of the choosen entity. Example `off`                                                                                                                                                |
-| %ha_to     | Contains the current state of the choosen entity. Example `on`                                                                                                                                             |
-| %ha_for    | Contains the duration the entity was in the state (format: hours:minutes:seconds)                                                                                                                          |
-| %ha_attrs  | Contains in JSON any attributes on the entity for the new state. For example, for lights you will get the color, brightness etc.                                                                           |
-| %ha_raw    | Raw JSON of the full entity state change response from homeassistant.                                                                                                                                      |
-| %err       | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
-| %errmsg    | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
+| Variable        | Function                                                                                                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `%ha_entity`    | The `entity_id` of the entity that triggered the profile.                                                                                                                                                  |
+| `%ha_from`      | The previous state of the entity (e.g. `off`). If a **Target attribute** is set, contains the previous value of that attribute instead.                                                                    |
+| `%ha_to`        | The new state of the entity (e.g. `on`). If a **Target attribute** is set, contains the new value of that attribute instead.                                                                               |
+| `%ha_for`       | How long the entity was in the previous state before changing (format: `hours:minutes:seconds`). Empty if not applicable.                                                                                  |
+| `%ha_entities`  | Comma-separated list of all entity IDs configured in the profile.                                                                                                                                          |
+| `%ha_attrs`     | JSON object of all attributes on the entity for the new state (e.g. brightness, color for lights).                                                                                                         |
+| `%ha_attr_1`–`%ha_attr_10` | Values of attributes mapped via the **Attribute variable mapping** section. Only populated for slots you have configured.                                                                    |
+| `%ha_raw`       | Raw JSON of the full entity state-change event from Home Assistant.                                                                                                                                        |
+| `%err`          | Error code. `0` means no error. If an error occurs the task itself will also error unless "Continue after error" is enabled on the action.                                                                 |
+| `%errmsg`       | Friendly error message, usually with a Java exception for details.                                                                                                                                         |
 
 #### Error codes
 
