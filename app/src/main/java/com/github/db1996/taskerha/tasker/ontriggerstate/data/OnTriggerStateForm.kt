@@ -11,8 +11,7 @@ data class EntityTriggerConfig(
     val targetAttribute: String = "",
     val fromState: String = "",
     val toState: String = "",
-    val forDuration: String = "",
-    val ignoreMainStateChanges: Boolean = false
+    val forDuration: String = ""
 )
 
 data class OnTriggerStateForm(

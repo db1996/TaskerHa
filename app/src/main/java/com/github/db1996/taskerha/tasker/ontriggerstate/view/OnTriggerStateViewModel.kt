@@ -82,7 +82,6 @@ class OnTriggerStateViewModel(
     fun setTo(index: Int, toState: String) = updateConfig(index) { it.copy(toState = toState) }
     fun setFor(index: Int, forDuration: String) = updateConfig(index) { it.copy(forDuration = forDuration) }
     fun setTargetAttribute(index: Int, value: String) = updateConfig(index) { it.copy(targetAttribute = value) }
-    fun setIgnoreMainStateChanges(index: Int, value: Boolean) = updateConfig(index) { it.copy(ignoreMainStateChanges = value) }
 
     private fun updateSharedConfig(update: (EntityTriggerConfig) -> EntityTriggerConfig) {
         form = form.copy(sharedConfig = update(form.sharedConfig))
@@ -92,7 +91,6 @@ class OnTriggerStateViewModel(
     fun setSharedTo(value: String) = updateSharedConfig { it.copy(toState = value) }
     fun setSharedFor(value: String) = updateSharedConfig { it.copy(forDuration = value) }
     fun setSharedTargetAttribute(value: String) = updateSharedConfig { it.copy(targetAttribute = value) }
-    fun setSharedIgnoreMainStateChanges(value: Boolean) = updateSharedConfig { it.copy(ignoreMainStateChanges = value) }
 
     fun setConfigPerEntity(value: Boolean) {
         if (value) {
@@ -105,8 +103,7 @@ class OnTriggerStateViewModel(
                         fromState = shared.fromState,
                         toState = shared.toState,
                         forDuration = shared.forDuration,
-                        targetAttribute = shared.targetAttribute,
-                        ignoreMainStateChanges = shared.ignoreMainStateChanges
+                        targetAttribute = shared.targetAttribute
                     )
             }
             form = form.copy(configPerEntity = true, entityConfigs = newConfigs)

@@ -102,7 +102,6 @@ class OnTriggerStateRunner :
         val entityTo: String
         val entityFor: String
         val targetAttr: String
-        val ignoreMain: Boolean
 
         if (configPerEntity) {
             fun splitPerEntity(raw: String): List<String> = raw.split("|;")
@@ -110,30 +109,16 @@ class OnTriggerStateRunner :
             val toList     = splitPerEntity(config.toState)
             val forList    = splitPerEntity(config.forDuration)
             val attrList   = splitPerEntity(config.targetAttribute)
-            val ignoreList = splitPerEntity(config.ignoreMainStateChanges)
             entityFrom = if (entityIndex >= 0) fromList.getOrElse(entityIndex) { "" } else ""
             entityTo   = if (entityIndex >= 0) toList.getOrElse(entityIndex) { "" } else ""
             entityFor  = if (entityIndex >= 0) forList.getOrElse(entityIndex) { "" } else ""
             targetAttr = if (entityIndex >= 0) attrList.getOrElse(entityIndex) { "" }.trim() else ""
-            ignoreMain = if (entityIndex >= 0) ignoreList.getOrElse(entityIndex) { "false" }.trim().lowercase() == "true" else false
         } else {
             // All-entities mode: single shared values apply to every entity
             entityFrom = config.fromState
             entityTo   = config.toState
             entityFor  = config.forDuration
             targetAttr = config.targetAttribute.trim()
-            ignoreMain = config.ignoreMainStateChanges.trim().lowercase() == "true"
-        }
-
-        // ignoreMainStateChanges: only proceed if the target attribute actually changed
-        if (ignoreMain && targetAttr.isNotBlank()) {
-            val fromAttrValue = envelope.from_state.attributes[targetAttr]?.toString()
-            val toAttrValue   = envelope.to_state.attributes[targetAttr]?.toString()
-            if (fromAttrValue == toAttrValue) {
-                CustomLogger.d("OnTriggerStateRunner", "Skipping: ignoreMainStateChanges=true, attribute '$targetAttr' unchanged ($fromAttrValue)")
-                return TaskerPluginResultConditionUnsatisfied()
-            }
-            CustomLogger.d("OnTriggerStateRunner", "Attribute '$targetAttr' changed: from=$fromAttrValue, to=$toAttrValue")
         }
 
         // UUID fast-path: when both sides have a triggerId, only ID equality matters.

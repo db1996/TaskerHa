@@ -30,9 +30,6 @@ class OnTriggerStateInput {
     @field:TaskerInputField("targetAttribute")
     var targetAttribute: String = ""
 
-    @field:TaskerInputField("ignoreMainStateChanges")
-    var ignoreMainStateChanges: String = ""
-
     @field:TaskerInputField("version")
     var version: String = ""
 

@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,6 +51,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 
+import androidx.compose.material3.Checkbox
 @OptIn(ExperimentalMaterial3Api::class, FlowPreview::class)
 @Composable
 fun OnTriggerStateScreen(
@@ -161,7 +161,6 @@ fun OnTriggerStateScreen(
                         config = form.sharedConfig,
                         availableAttributes = viewModel.availableAttributes.values.flatten().toSet().toList(),
                         onTargetAttributeChange = { viewModel.setSharedTargetAttribute(it) },
-                        onIgnoreMainStateChangesChange = { viewModel.setSharedIgnoreMainStateChanges(it) },
                         onFromChange = { viewModel.setSharedFrom(it) },
                         onToChange = { viewModel.setSharedTo(it) },
                         onForChange = { viewModel.setSharedFor(it) },
@@ -183,7 +182,6 @@ fun OnTriggerStateScreen(
                             config = config,
                             availableAttributes = viewModel.availableAttributes[entityId] ?: emptyList(),
                             onTargetAttributeChange = { viewModel.setTargetAttribute(index, it) },
-                            onIgnoreMainStateChangesChange = { viewModel.setIgnoreMainStateChanges(index, it) },
                             onFromChange = { viewModel.setFrom(index, it) },
                             onToChange = { viewModel.setTo(index, it) },
                             onForChange = { viewModel.setFor(index, it) },
@@ -212,7 +210,6 @@ private fun EntityConfigCard(
     config: EntityTriggerConfig,
     availableAttributes: List<String>,
     onTargetAttributeChange: (String) -> Unit,
-    onIgnoreMainStateChangesChange: (Boolean) -> Unit,
     onFromChange: (String) -> Unit,
     onToChange: (String) -> Unit,
     onForChange: (String) -> Unit,
@@ -293,31 +290,6 @@ private fun EntityConfigCard(
                         label = { Text("Target attribute (optional)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
-                    )
-                }
-
-                // Ignore main state changes checkbox
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = config.targetAttribute.isNotBlank()) {
-                            onIgnoreMainStateChangesChange(!config.ignoreMainStateChanges)
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Checkbox(
-                        checked = config.ignoreMainStateChanges,
-                        onCheckedChange = onIgnoreMainStateChangesChange,
-                        enabled = config.targetAttribute.isNotBlank()
-                    )
-                    Text(
-                        text = "Ignore main state changes",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (config.targetAttribute.isNotBlank())
-                            MaterialTheme.colorScheme.onSurface
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     )
                 }
 

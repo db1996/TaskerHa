@@ -49,14 +49,12 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
                 toState = configs.joinToString("|;") { it.toState }
                 forDuration = configs.joinToString("|;") { it.forDuration }
                 targetAttribute = configs.joinToString("|;") { it.targetAttribute }
-                ignoreMainStateChanges = configs.joinToString("|;") { it.ignoreMainStateChanges.toString() }
             } else {
                 val shared = builtForm.sharedConfig
                 fromState = shared.fromState
                 toState = shared.toState
                 forDuration = shared.forDuration
                 targetAttribute = shared.targetAttribute
-                ignoreMainStateChanges = shared.ignoreMainStateChanges.toString()
             }
         }
     }
@@ -86,7 +84,6 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
             val toList     = splitField(input.toState)
             val forList    = splitField(input.forDuration)
             val attrList   = splitField(input.targetAttribute)
-            val ignoreList = splitField(input.ignoreMainStateChanges)
             sharedConfig = EntityTriggerConfig()
             entityConfigs = parsedEntityIds.mapIndexed { i, id ->
                 EntityTriggerConfig(
@@ -94,8 +91,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
                     targetAttribute = attrList[i],
                     fromState = fromList[i],
                     toState = toList[i],
-                    forDuration = forList[i],
-                    ignoreMainStateChanges = ignoreList[i].trim().lowercase() == "true"
+                    forDuration = forList[i]
                 )
             }
         } else {
@@ -104,8 +100,7 @@ class ActivityConfigOnTriggerState : BaseTaskerConfigActivity<
                 fromState = input.fromState,
                 toState = input.toState,
                 forDuration = input.forDuration,
-                targetAttribute = input.targetAttribute,
-                ignoreMainStateChanges = input.ignoreMainStateChanges.trim().lowercase() == "true"
+                targetAttribute = input.targetAttribute
             )
             entityConfigs = parsedEntityIds.map { EntityTriggerConfig(entityId = it) }
         }
