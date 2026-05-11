@@ -194,13 +194,13 @@ event_data:
 
 The following variables are available from within tasker after the action
 
-| Variable | Function                                                                                                                                                                                                   |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| %ha_type | Contains the type sent in the event                                                                                                                                                                        |
-| %ha_message | Contains the message sent in the event                                                                                                                                                                  |
-| %rawJson | Contains the raw JSON response from the event                                                                                                                                                              |
-| %err     | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
-| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
+| Variable    | Function                                                                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_type    | Contains the type sent in the event                                                                                                                                                                        |
+| %ha_message | Contains the message sent in the event                                                                                                                                                                     |
+| %rawJson    | Contains the raw JSON response from the event                                                                                                                                                              |
+| %err        | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
+| %errmsg     | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
 
 #### Error codes
 
@@ -247,12 +247,12 @@ event_data:
 
 The following variables are available from within tasker after the action
 
-| Variable | Function                                                                                                                                                                                                   |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| %ha_type | Contains the type sent in the event                                                                                                                                                                        |
-| %ha_message | Contains the message sent in the event                                                                                                                                                                  |
-| %err     | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
-| %errmsg  | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
+| Variable    | Function                                                                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| %ha_type    | Contains the type sent in the event                                                                                                                                                                        |
+| %ha_message | Contains the message sent in the event                                                                                                                                                                     |
+| %err        | Error code, is 0 if no error occured. Check below for a complete list of error codes. If an error occurs it will also error the task itself unless you have "continue after error" turned on on the action |
+| %errmsg     | Error message. Usually contains a friendly error message, with some java exception next to it.                                                                                                             |
 
 #### Error codes
 
@@ -313,18 +313,18 @@ Map brightness to a variable for easy use downstream:
 
 The following variables are available in Tasker when the profile fires.
 
-| Variable        | Function                                                                                                                                                                                                   |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `%ha_entity`    | The `entity_id` of the entity that triggered the profile.                                                                                                                                                  |
-| `%ha_from`      | The previous state of the entity (e.g. `off`). If a **Target attribute** is set, contains the previous value of that attribute instead.                                                                    |
-| `%ha_to`        | The new state of the entity (e.g. `on`). If a **Target attribute** is set, contains the new value of that attribute instead.                                                                               |
-| `%ha_for`       | How long the entity was in the previous state before changing (format: `hours:minutes:seconds`). Empty if not applicable.                                                                                  |
-| `%ha_entities`  | Comma-separated list of all entity IDs configured in the profile.                                                                                                                                          |
-| `%ha_attrs`     | JSON object of all attributes on the entity for the new state (e.g. brightness, color for lights).                                                                                                         |
-| `%ha_attr_1`–`%ha_attr_10` | Values of attributes mapped via the **Attribute variable mapping** section. Only populated for slots you have configured.                                                                    |
-| `%ha_raw`       | Raw JSON of the full entity state-change event from Home Assistant.                                                                                                                                        |
-| `%err`          | Error code. `0` means no error. If an error occurs the task itself will also error unless "Continue after error" is enabled on the action.                                                                 |
-| `%errmsg`       | Friendly error message, usually with a Java exception for details.                                                                                                                                         |
+| Variable                   | Function                                                                                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `%ha_entity`               | The `entity_id` of the entity that triggered the profile.                                                                                  |
+| `%ha_from`                 | The previous state of the entity (e.g. `off`). If a **Target attribute** is set, contains the previous value of that attribute instead.    |
+| `%ha_to`                   | The new state of the entity (e.g. `on`). If a **Target attribute** is set, contains the new value of that attribute instead.               |
+| `%ha_for`                  | How long the entity was in the previous state before changing (format: `hours:minutes:seconds`). Empty if not applicable.                  |
+| `%ha_entities`             | Comma-separated list of all entity IDs configured in the profile.                                                                          |
+| `%ha_attrs`                | JSON object of all attributes on the entity for the new state (e.g. brightness, color for lights).                                         |
+| `%ha_attr_1`–`%ha_attr_10` | Values of attributes mapped via the **Attribute variable mapping** section. Only populated for slots you have configured.                  |
+| `%ha_raw`                  | Raw JSON of the full entity state-change event from Home Assistant.                                                                        |
+| `%err`                     | Error code. `0` means no error. If an error occurs the task itself will also error unless "Continue after error" is enabled on the action. |
+| `%errmsg`                  | Friendly error message, usually with a Java exception for details.                                                                         |
 
 #### Error codes
 
