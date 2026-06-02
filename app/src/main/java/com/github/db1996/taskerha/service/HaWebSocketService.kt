@@ -74,7 +74,14 @@ class HaWebSocketService : Service(), BaseLogger {
             CustomLogger.i(TAG, "Attempting to start websocket", LogChannel.WEBSOCKET)
 
             val intent = Intent(context, HaWebSocketService::class.java)
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: IllegalStateException) {
+                // ForegroundServiceStartNotAllowedException (API 31+) is thrown when the app is
+                // in a background state (e.g. process restored after an OS update). The service
+                // will be started the next time the user opens the app from the foreground.
+                CustomLogger.e(TAG, "Cannot start foreground service from background state", LogChannel.WEBSOCKET)
+            }
         }
 
         fun stop(context: Context) {
