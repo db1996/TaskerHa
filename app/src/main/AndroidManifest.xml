@@ -92,6 +92,16 @@
         </activity>
 
         <activity
+            android:name=".tasker.testconnection.TestConnectionActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="HA Test Connection">
+            <intent-filter>
+                <action android:name="com.twofortyfouram.locale.intent.action.EDIT_SETTING" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".activities.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.TaskerHa">
