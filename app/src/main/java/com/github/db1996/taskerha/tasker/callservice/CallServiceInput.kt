@@ -13,6 +13,8 @@ class CallServiceInput {
     @field:TaskerInputField("service")
     var service: String = ""
 
+    @Deprecated("Migrated to dataJson with entity_id key", ReplaceWith("dataJson"),
+        DeprecationLevel.WARNING)
     @field:TaskerInputField("entityId")
     var entityId: String = ""
 

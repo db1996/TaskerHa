@@ -59,7 +59,10 @@ data class HaServiceField(
 
     var min: Double? = null,
     var max: Double? = null,
-    var unit_of_measurement: String? = null
+    var unit_of_measurement: String? = null,
+    
+    var multipleEntities: Boolean = false,
+    var domain: String? = null  // Domain filter for entity fields (e.g., "automation", "light")
 )
 
 data class Option(

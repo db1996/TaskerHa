@@ -105,16 +105,18 @@ class CallServiceViewModel(
     override fun buildForm(): CallServiceFormBuiltForm {
         val domain = form.domain
         val service = form.service
-        val entityId = form.entityId
-
+        
         val data = form.dataContainer
             .filter { it.value.toggle.value }
             .mapValues { it.value.value.value }
+        
+        // For backward compatibility, populate legacy entityId field from dataContainer["entity_id"]
+        val entityIdValue = data.getOrDefault("entity_id", "")
 
         return CallServiceFormBuiltForm(
             domain = domain,
             service = service,
-            entityId = entityId,
+            entityId = entityIdValue,  // @Deprecated - for old Tasker versions
             data = data,
             blurb = ""
         )
@@ -146,11 +148,23 @@ class CallServiceViewModel(
             }
             restoredDataContainer[field.id] = state
         }
+        
+        // Backward compatibility: Migrate legacy entityId to dataContainer["entity_id"]
+        // This handles old Tasker configs that stored entity in the legacy field
+        if (data.entityId.isNotBlank() && !data.data.containsKey("entity_id")) {
+            // Move to dataContainer if entity_id field exists in service
+            if (pservice.fields.any { it.id == "entity_id" }) {
+                val entityState = restoredDataContainer.getOrPut("entity_id") { FieldState() }
+                entityState.value.value = data.entityId
+                entityState.toggle.value = true
+            }
+        }
+        
         logDebug("Restoring form: ${data.domain}, ${data.service}, ${data.entityId},")
         selectedService = pservice
 
         form = CallServiceFormForm(
-            entityId = data.entityId,
+            entityId = data.entityId,  // Keep for display purposes during migration
             domain = data.domain,
             service = data.service,
             dataContainer = restoredDataContainer,

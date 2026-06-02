@@ -77,6 +77,16 @@ fun FieldInput(
                 )
             }
 
+            HaServiceFieldType.STATE -> {
+                // Entity ID field - show with helpful label
+                FieldEntityInput(
+                    field = field,
+                    state = state,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
             else -> {
                 FieldTextInput(
                     field = field,
@@ -188,6 +198,22 @@ fun FieldDateTimeInput(
         modifier = modifier,
         label = { Text(field.name ?: field.id) },
         readOnly = true
+    )
+}
+
+@Composable
+fun FieldEntityInput(
+    field: HaServiceField,
+    state: FieldState,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextField(
+        value = state.value.value,
+        onValueChange = onValueChange,
+        label = { Text("${field.name ?: field.id} (Entity ID)") },
+        placeholder = { Text("e.g., light.living_room") },
+        modifier = modifier
     )
 }
 

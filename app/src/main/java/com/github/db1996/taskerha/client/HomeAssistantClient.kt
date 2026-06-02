@@ -320,6 +320,9 @@ class HomeAssistantClient(
         }
 
         val broadTarget = haService.target?.isEmpty() ?: false
+        
+        // Extract domain filter from target.entity[].domain[]
+        val targetDomain = extractTargetDomain(haService.target, domain)
 
         val actualService = ActualService(
             id = serviceId,
@@ -337,7 +340,48 @@ class HomeAssistantClient(
             if (id != "advanced_fields") convertField(fieldData, id)?.let { actualService.fields += it }
         }
 
+        // Inject synthetic entity_id field for services with entity targets
+        // Skip if an explicit entity_id field already exists (HACS services)
+        if (hasEntityTarget && actualService.fields.none { it.id == "entity_id" }) {
+            val syntheticEntityField = HaServiceField(
+                id = "entity_id",
+                name = if (broadTarget) "Entities" else "Entity",
+                description = "Target entity for this service",
+                required = true,
+                type = HaServiceFieldType.STATE,
+                multipleEntities = broadTarget,
+                domain = targetDomain
+            )
+            actualService.fields.add(0, syntheticEntityField)  // Prepend to top
+        } else if (hasEntityTarget) {
+            // If explicit entity_id field exists, mark it with multipleEntities flag
+            actualService.fields.find { it.id == "entity_id" }?.let { field ->
+                field.multipleEntities = broadTarget
+                field.domain = targetDomain
+                if (field.name.isNullOrBlank()) {
+                    field.name = if (broadTarget) "Entities" else "Entity"
+                }
+            }
+        }
+
         return actualService
+    }
+    
+    private fun extractTargetDomain(target: Map<String, JsonElement>?, serviceDomain: String): String? {
+        try {
+            // Parse target.entity[].domain[] structure
+            val entityArray = target?.get("entity")?.jsonArray ?: return if (target?.isEmpty() == false) serviceDomain else null
+            if (entityArray.isEmpty()) return null
+            
+            val firstEntity = entityArray.firstOrNull()?.jsonObject ?: return null
+            val domainArray = firstEntity["domain"]?.jsonArray ?: return null
+            val domainStr = domainArray.firstOrNull()?.jsonPrimitive?.contentOrNull
+            
+            return domainStr
+        } catch (e: Exception) {
+            // If parsing fails, default to service domain if not broad target
+            return null
+        }
     }
 
     private fun convertField(field: Map<String, JsonElement>, id: String): HaServiceField? {
@@ -357,6 +401,14 @@ class HomeAssistantClient(
             "date" -> fieldData.type = HaServiceFieldType.DATE
             "time" -> fieldData.type = HaServiceFieldType.TIME
             "datetime" -> fieldData.type = HaServiceFieldType.DATETIME
+        }
+
+        // Special handling for entity_id fields (common in PyScript services)
+        // Use STATE type to indicate this is an entity reference
+        if (id == "entity_id" || id.startsWith("entity_id_")) {
+            if (fieldData.type == null) {
+                fieldData.type = HaServiceFieldType.STATE
+            }
         }
 
         if (fieldData.type == null) {
@@ -407,10 +459,14 @@ class HomeAssistantClient(
                     }
                 }
             }
-
-
         }
 
-        return fieldData.type?.let { fieldData }
+        // Default to TEXT for any field without a determined type (e.g., PyScript services)
+        // This ensures fields are always shown, even if Home Assistant doesn't provide type info
+        if (fieldData.type == null) {
+            fieldData.type = HaServiceFieldType.TEXT
+        }
+
+        return fieldData
     }
 }
