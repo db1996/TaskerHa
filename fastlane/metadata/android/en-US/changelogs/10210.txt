@@ -1,1 +1,4 @@
+- Android update crashed the app on startup
+- More consistent entity picker
+- Pyscript entity picker should now work correctly
 - Added network test tasker action
