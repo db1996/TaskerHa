@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.util.EntityRecents
@@ -34,6 +35,14 @@ class TaskerHaApplication : Application() {
         EntityRecents.init(this)
         ServiceRecents.init(this)
         PrefsJsonStore.init(this)
+        
+        // Initialize instance repository and migrate from legacy settings if needed
+        HaInstanceRepository.init(this)
+        if (HaInstanceRepository.needsMigration()) {
+            HaInstanceRepository.migrateFromLegacy()
+            CustomLogger.i("TaskerHaApplication", "Migrated legacy settings to instance repository")
+        }
+        
         createForegroundChannel()
 
         // Start WiFi monitoring for SSID-based URL resolution.

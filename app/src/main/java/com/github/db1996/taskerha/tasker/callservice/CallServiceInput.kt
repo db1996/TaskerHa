@@ -1,12 +1,13 @@
 package com.github.db1996.taskerha.tasker.callservice
 
+import com.github.db1996.taskerha.tasker.base.HasInstanceId
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputObject
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
-class CallServiceInput {
+class CallServiceInput : HasInstanceId {
     @field:TaskerInputField("domain")
     var domain: String = ""
 
@@ -20,6 +21,9 @@ class CallServiceInput {
 
     @field:TaskerInputField("dataJson")
     var dataJson: String = "{}"
+
+    @field:TaskerInputField("instanceId")
+    override var instanceId: String = ""
 }
 
 @TaskerOutputObject

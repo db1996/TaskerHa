@@ -15,11 +15,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Wifi
@@ -35,6 +40,8 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.datamodels.HaInstance
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.logging.LogLevel
 import com.github.db1996.taskerha.logging.CustomLogger
@@ -48,7 +55,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class SettingsTab(val label: String) {
-    CONNECTION("Connection"),
+    INSTANCES("Instances"),
     WEBSOCKET("WebSocket"),
     TRIGGERS("Triggers"),
     LOGGING("Logging"),
@@ -64,49 +71,15 @@ fun MainSettingsScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.CONNECTION) }
+    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.INSTANCES) }
 
-    // --- Connection state
-    var url by remember { mutableStateOf(HaSettings.loadUrl(context)) }
-    var token by remember { mutableStateOf(HaSettings.loadToken(context)) }
+    // Observe instances from repository
+    val instances by HaInstanceRepository.instances.collectAsState()
+    val activeInstanceId by HaInstanceRepository.activeInstanceId.collectAsState()
 
-    // --- Local URL state
-    var localUrlEnabled by remember { mutableStateOf(HaSettings.loadLocalUrlEnabled(context)) }
-    var localUrl by remember { mutableStateOf(HaSettings.loadLocalUrl(context)) }
-    var homeSsids by remember { mutableStateOf(HaSettings.loadHomeSsids(context)) }
-
-    // --- Client certificate state
-    var clientCertEnabled by remember { mutableStateOf(HaSettings.loadClientCertEnabled(context)) }
-    var clientCertAlias by remember { mutableStateOf(HaSettings.loadClientCertAlias(context)) }
-
-    // Single test status — shows which target was last tested.
-    var status by remember { mutableStateOf(Status.Idle) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var lastTestedLabel by remember { mutableStateOf<String?>(null) }
-    var testingLabel by remember { mutableStateOf<String?>(null) }
-    var saved by remember { mutableStateOf(false) }
-
-    val unsavedChanges by remember(
-        url, token, localUrlEnabled, localUrl, homeSsids, clientCertEnabled, clientCertAlias
-    ) {
-        mutableStateOf(
-            url != HaSettings.loadUrl(context) ||
-            token != HaSettings.loadToken(context) ||
-            localUrlEnabled != HaSettings.loadLocalUrlEnabled(context) ||
-            localUrl != HaSettings.loadLocalUrl(context) ||
-            homeSsids != HaSettings.loadHomeSsids(context) ||
-            clientCertEnabled != HaSettings.loadClientCertEnabled(context) ||
-            clientCertAlias != HaSettings.loadClientCertAlias(context)
-        )
-    }
-
-    fun setSaved() {
-        saved = true
-        scope.launch {
-            delay(1200)
-            saved = false
-        }
-    }
+    // Instance editor state
+    var editingInstance by remember { mutableStateOf<HaInstance?>(null) }
+    var showActivateConfirmation by remember { mutableStateOf<HaInstance?>(null) }
 
     // --- Websocket state
     var wsEnabled by remember { mutableStateOf(HaSettings.loadWebSocketEnabled(context)) }
@@ -139,67 +112,12 @@ fun MainSettingsScreen(
     var generalLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.GENERAL)) }
     var wsLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.WEBSOCKET)) }
 
-    val testing = testingLabel != null
-
-    // Top bar depends on selected tab
-    LaunchedEffect(selectedTab, unsavedChanges, testing, saved, url, token) {
+    // Simplified top bar - no save button needed for instances tab
+    LaunchedEffect(selectedTab) {
         setTopBar {
             TopAppBar(
-                title = { Text("TaskerHA Settings") },
-                actions = {
-                    if (selectedTab == SettingsTab.CONNECTION) {
-                        FilledIconButton(
-                            enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
-                            onClick = {
-                                HaSettings.save(context, url.trim(), token.trim())
-                                HaSettings.saveLocalUrlEnabled(context, localUrlEnabled)
-                                HaSettings.saveLocalUrl(context, localUrl.trim())
-                                HaSettings.saveHomeSsids(context, homeSsids)
-                                HaSettings.saveClientCertEnabled(context, clientCertEnabled)
-                                HaSettings.saveClientCertAlias(context, clientCertAlias)
-                                setSaved()
-                                if (wsEnabled) {
-                                    HaWebSocketService.stop(context)
-                                    HaWebSocketService.start(context)
-                                }
-                            }
-                        ) {
-                            if (saved) {
-                                Icon(Icons.Rounded.CheckCircle, contentDescription = "Saved")
-                            } else {
-                                Icon(Icons.Rounded.Save, contentDescription = "Save settings")
-                            }
-                        }
-                    }
-                }
+                title = { Text("TaskerHA Settings") }
             )
-        }
-    }
-
-    fun runTest(label: String, targetUrl: String) {
-        testingLabel = label
-        status = Status.Testing
-        lastTestedLabel = label
-        // Build a one-shot OkHttpClient honoring the IN-MEMORY cert toggle/alias
-        // so the user can test without saving first.
-        val httpClient = HaHttpClientFactory.build(
-            context,
-            clientCertEnabled = clientCertEnabled,
-            clientCertAlias = clientCertAlias
-        )
-        val client = HomeAssistantClient(targetUrl.trim(), token.trim(), httpClient)
-
-        scope.launch {
-            val success = withContext(Dispatchers.IO) {
-                try {
-                    client.ping()
-                } catch (_: Exception) {
-                    false
-                }
-            }
-            status = if (success) Status.Success else Status.Failed
-            testingLabel = null
-            error = client.error
         }
     }
 
@@ -218,37 +136,50 @@ fun MainSettingsScreen(
             }
         }
     ) { innerPadding ->
+        // INSTANCES tab uses LazyColumn which handles its own scrolling
+        // Other tabs need parent scroll for their static content
+        val needsScroll = selectedTab != SettingsTab.INSTANCES
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .then(
+                    if (needsScroll) Modifier.verticalScroll(rememberScrollState())
+                    else Modifier
+                )
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             when (selectedTab) {
-                SettingsTab.CONNECTION -> ConnectionTab(
-                    url = url,
-                    token = token,
-                    testing = testing,
-                    testingLabel = testingLabel,
-                    lastTestedLabel = lastTestedLabel,
-                    status = status,
-                    error = error,
-                    localUrlEnabled = localUrlEnabled,
-                    localUrl = localUrl,
-                    homeSsids = homeSsids,
-                    clientCertEnabled = clientCertEnabled,
-                    clientCertAlias = clientCertAlias,
-                    onUrlChange = { url = it },
-                    onTokenChange = { token = it },
-                    onLocalUrlEnabledChange = { localUrlEnabled = it },
-                    onLocalUrlChange = { localUrl = it },
-                    onHomeSsidsChange = { homeSsids = it },
-                    onClientCertEnabledChange = { clientCertEnabled = it },
-                    onClientCertAliasChange = { clientCertAlias = it },
-                    onTestRemote = { runTest("Remote", url) },
-                    onTestLocal = { runTest("Local", localUrl) }
+                SettingsTab.INSTANCES -> InstancesTab(
+                    instances = instances,
+                    activeInstanceId = activeInstanceId,
+                    onAddInstance = {
+                        editingInstance = HaInstance(
+                            id = HaInstance.generateShortId(),
+                            name = "",
+                            remoteUrl = "",
+                            token = "",
+                            isDefault = instances.isEmpty()
+                        )
+                    },
+                    onEditInstance = { instance ->
+                        editingInstance = instance
+                    },
+                    onDeleteInstance = { instance ->
+                        HaInstanceRepository.delete(instance.id)
+                    },
+                    onSetDefault = { instance ->
+                        HaInstanceRepository.setDefault(instance.id)
+                    },
+                    onActivateInstance = { instance ->
+                        if (wsEnabled && activeInstanceId != instance.id) {
+                            showActivateConfirmation = instance
+                        } else {
+                            HaInstanceRepository.setActive(instance.id)
+                        }
+                    }
                 )
 
                 SettingsTab.WEBSOCKET -> WebSocketTab(
@@ -337,6 +268,394 @@ fun MainSettingsScreen(
             }
         )
     }
+
+    // Instance editor dialog
+    editingInstance?.let { instance ->
+        InstanceEditorDialog(
+            instance = instance,
+            onDismiss = { editingInstance = null },
+            onSave = { updatedInstance ->
+                if (instances.any { it.id == updatedInstance.id }) {
+                    HaInstanceRepository.update(updatedInstance)
+                } else {
+                    HaInstanceRepository.add(updatedInstance)
+                }
+                editingInstance = null
+            }
+        )
+    }
+
+    // Activation confirmation dialog
+    showActivateConfirmation?.let { instance ->
+        AlertDialog(
+            onDismissRequest = { showActivateConfirmation = null },
+            title = { Text("Switch Active Instance?") },
+            text = {
+                Text(
+                    "Switching the active instance will change which Home Assistant triggers are active. " +
+                            "The websocket connection will reconnect to:\n\n" +
+                            (instance.name.takeIf { it.isNotBlank() } ?: instance.remoteUrl)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        HaInstanceRepository.setActive(instance.id)
+                        HaWebSocketService.stop(context)
+                        HaWebSocketService.start(context)
+                        showActivateConfirmation = null
+                    }
+                ) { Text("Switch") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showActivateConfirmation = null }
+                ) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun InstancesTab(
+    instances: List<HaInstance>,
+    activeInstanceId: String?,
+    onAddInstance: () -> Unit,
+    onEditInstance: (HaInstance) -> Unit,
+    onDeleteInstance: (HaInstance) -> Unit,
+    onSetDefault: (HaInstance) -> Unit,
+    onActivateInstance: (HaInstance) -> Unit
+) {
+    val sortedInstances = HaInstanceRepository.getAllSorted()
+    
+    if (instances.isEmpty()) {
+        // Empty state
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                "No instances configured",
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Text(
+                "Add your first Home Assistant instance to get started",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(onClick = onAddInstance) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add Instance")
+            }
+        }
+        return
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(sortedInstances, key = { it.id }) { instance ->
+                InstanceCard(
+                    instance = instance,
+                    isActive = instance.id == activeInstanceId,
+                    onEdit = { onEditInstance(instance) },
+                    onDelete = { onDeleteInstance(instance) },
+                    onSetDefault = { onSetDefault(instance) },
+                    onActivate = { onActivateInstance(instance) }
+                )
+            }
+        }
+
+        // FAB for adding instances
+        FloatingActionButton(
+            onClick = onAddInstance,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Rounded.Add, contentDescription = "Add instance")
+        }
+    }
+}
+
+@Composable
+private fun InstanceCard(
+    instance: HaInstance,
+    isActive: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSetDefault: () -> Unit,
+    onActivate: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header with title and badges
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (instance.name.isNotBlank()) {
+                        Text(
+                            instance.name,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+                    if (instance.isDefault) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                "Default",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    if (isActive) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                "Active",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
+                Text(
+                    instance.remoteUrl.takeIf { it.isNotBlank() } ?: "(No URL)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (instance.localUrl.isNotBlank()) {
+                    Text(
+                        "Local: ${instance.localUrl}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // First row of buttons: Edit and Delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Edit")
+                }
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Delete")
+                }
+            }
+
+            // Second row of buttons: Set Default and Activate
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSetDefault,
+                    enabled = !instance.isDefault,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Set Default")
+                }
+                OutlinedButton(
+                    onClick = onActivate,
+                    enabled = !isActive,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Activate")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstanceEditorDialog(
+    instance: HaInstance,
+    onDismiss: () -> Unit,
+    onSave: (HaInstance) -> Unit
+) {
+    var name by remember { mutableStateOf(instance.name) }
+    var remoteUrl by remember { mutableStateOf(instance.remoteUrl) }
+    var localUrl by remember { mutableStateOf(instance.localUrl) }
+    var token by remember { mutableStateOf(instance.token) }
+    var homeSsids by remember { mutableStateOf(instance.homeSsids) }
+    var clientCertEnabled by remember { mutableStateOf(instance.clientCertEnabled) }
+    var clientCertAlias by remember { mutableStateOf(instance.clientCertAlias) }
+    
+    var status by remember { mutableStateOf(Status.Idle) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var testingLabel by remember { mutableStateOf<String?>(null) }
+    
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    
+    fun runTest(label: String, targetUrl: String) {
+        testingLabel = label
+        status = Status.Testing
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = clientCertEnabled,
+            clientCertAlias = clientCertAlias
+        )
+        val client = HomeAssistantClient(targetUrl.trim(), token.trim(), httpClient)
+
+        scope.launch {
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            status = if (success) Status.Success else Status.Failed
+            testingLabel = null
+            error = client.error
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(if (instance.remoteUrl.isBlank()) "Add Instance" else "Edit Instance")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name (optional)") },
+                    placeholder = { Text("Home, Office, etc.") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = remoteUrl,
+                    onValueChange = { remoteUrl = it },
+                    label = { Text("Remote URL") },
+                    placeholder = { Text("https://ha.example.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    label = { Text("Access Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+
+                ClientCertSection(
+                    enabled = clientCertEnabled,
+                    alias = clientCertAlias,
+                    onEnabledChange = { clientCertEnabled = it },
+                    onAliasChange = { clientCertAlias = it }
+                )
+
+                val canTestRemote = testingLabel == null && remoteUrl.isNotBlank() && token.isNotBlank()
+                Button(
+                    enabled = canTestRemote,
+                    onClick = { runTest("Remote", remoteUrl) }
+                ) {
+                    Text(if (testingLabel == "Remote") "Testing..." else "Test Connection")
+                }
+                StatusRow(status, error)
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                LocalUrlSection(
+                    enabled = localUrl.isNotBlank() || homeSsids.isNotEmpty(),
+                    localUrl = localUrl,
+                    homeSsids = homeSsids,
+                    onEnabledChange = { enabled ->
+                        if (!enabled) {
+                            localUrl = ""
+                            homeSsids = emptySet()
+                        }
+                    },
+                    onLocalUrlChange = { localUrl = it },
+                    onHomeSsidsChange = { homeSsids = it }
+                )
+
+                val canTestLocal = testingLabel == null && localUrl.isNotBlank() && token.isNotBlank()
+                if (localUrl.isNotBlank()) {
+                    Button(
+                        enabled = canTestLocal,
+                        onClick = { runTest("Local", localUrl) }
+                    ) {
+                        Text(if (testingLabel == "Local") "Testing..." else "Test Local")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = remoteUrl.isNotBlank() && token.isNotBlank(),
+                onClick = {
+                    onSave(
+                        instance.copy(
+                            name = name.trim(),
+                            remoteUrl = remoteUrl.trim(),
+                            localUrl = localUrl.trim(),
+                            token = token.trim(),
+                            homeSsids = homeSsids,
+                            clientCertEnabled = clientCertEnabled,
+                            clientCertAlias = clientCertAlias
+                        )
+                    )
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable

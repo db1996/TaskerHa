@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
@@ -42,7 +43,9 @@ class TestConnectionActivity : AppCompatActivity(), TaskerPluginConfig<TestConne
     }
 
     override val inputForTasker: TaskerInput<TestConnectionInput>
-        get() = TaskerInput(TestConnectionInput())
+        get() = TaskerInput(TestConnectionInput().apply {
+            instanceId = HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
+        })
 }
 
 @Composable

@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,7 +17,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.partials.InstanceSelector
 import com.github.db1996.taskerha.activities.partials.ServiceSelector
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
 import com.github.db1996.taskerha.tasker.callservice.view.CallServiceViewModel
@@ -24,9 +27,11 @@ import com.github.db1996.taskerha.tasker.callservice.view.CallServiceViewModel
 @Composable
 fun CallServiceScreen(
     viewModel: CallServiceViewModel,
-    onSave: (CallServiceFormBuiltForm) -> Unit
+    onSave: (CallServiceFormBuiltForm) -> Unit,
+    isNewAction: Boolean = false
 ) {
     var fieldEntitySearching by remember { mutableStateOf<String?>(null) }
+    val instances by HaInstanceRepository.instances.collectAsState()
 
     // Load entities on first composition
     LaunchedEffect(Unit) {
@@ -51,6 +56,20 @@ fun CallServiceScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Instance selector (only for new actions)
+            if (instances.isNotEmpty()) {
+                InstanceSelector(
+                    instances = instances,
+                    selectedInstanceId = form.instanceId,
+                    onInstanceSelected = { instanceId ->
+                        if (isNewAction) {
+                            viewModel.changeInstance(instanceId)
+                        }
+                    },
+                    enabled = isNewAction
+                )
+            }
+
             if (viewModel.clientError != "") {
                 Text(viewModel.clientError, color = MaterialTheme.colorScheme.error)
 

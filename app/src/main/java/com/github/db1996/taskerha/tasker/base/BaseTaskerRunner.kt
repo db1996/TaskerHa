@@ -2,6 +2,8 @@ package com.github.db1996.taskerha.tasker.base
 
 import android.content.Context
 import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.HaInstance
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.util.HaHttpClientFactory
@@ -64,7 +66,9 @@ abstract class BaseTaskerRunner<I : Any, O : Any> : TaskerPluginRunnerAction<I, 
         return runBlocking {
             try {
                 val result = if (needsClient) {
-                    val client = createClient(context)
+                    // Extract instanceId if available
+                    val instanceId = (input.regular as? HasInstanceId)?.instanceId ?: ""
+                    val client = createClient(context, instanceId)
 
                     logInfo("Pinging HomeAssistant...")
                     if (!client.ping()) {
@@ -93,12 +97,30 @@ abstract class BaseTaskerRunner<I : Any, O : Any> : TaskerPluginRunnerAction<I, 
     }
 
     /**
-     * Create a HomeAssistantClient from context settings
+     * Create a HomeAssistantClient from context settings or instance ID
+     * 
+     * @param context Android context
+     * @param instanceId Optional instance ID to target. If blank, uses default instance
      */
-    private fun createClient(context: Context): HomeAssistantClient {
-        val url = HaSettings.resolveUrl(context)
-        val token = HaSettings.loadToken(context)
-        return HomeAssistantClient(url, token, HaHttpClientFactory.build(context))
+    private fun createClient(context: Context, instanceId: String = ""): HomeAssistantClient {
+        // Resolve instance - try by ID first, fall back to default
+        val instance: HaInstance? = if (instanceId.isNotBlank()) {
+            HaInstanceRepository.getById(instanceId) ?: HaInstanceRepository.getDefault()
+        } else {
+            HaInstanceRepository.getDefault()
+        }
+
+        // If repository returns null, fall back to legacy HaSettings
+        val url = instance?.resolveUrl() ?: HaSettings.resolveUrl(context)
+        val token = instance?.token ?: HaSettings.loadToken(context)
+        
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = instance?.clientCertEnabled ?: false,
+            clientCertAlias = instance?.clientCertAlias ?: ""
+        )
+        
+        return HomeAssistantClient(url, token, httpClient)
     }
 
     /**

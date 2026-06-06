@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.partials.InstanceSelector
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.EntityTriggerConfig
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
@@ -56,9 +59,11 @@ import androidx.compose.material3.Checkbox
 @Composable
 fun OnTriggerStateScreen(
     viewModel: OnTriggerStateViewModel,
-    onSave: (OnTriggerStateBuiltForm) -> Unit
+    onSave: (OnTriggerStateBuiltForm) -> Unit,
+    isNewAction: Boolean = false
 ) {
     var entityAdding by remember { mutableStateOf(false) }
+    val instances by HaInstanceRepository.instances.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadEntities()
@@ -86,6 +91,20 @@ fun OnTriggerStateScreen(
                 .then(if (!entityAdding) Modifier.verticalScroll(rememberScrollState()) else Modifier),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Instance selector (only for new triggers)
+            if (instances.isNotEmpty()) {
+                InstanceSelector(
+                    instances = instances,
+                    selectedInstanceId = form.instanceId,
+                    onInstanceSelected = { instanceId ->
+                        if (isNewAction) {
+                            viewModel.changeInstance(instanceId)
+                        }
+                    },
+                    enabled = isNewAction
+                )
+            }
+
             if (viewModel.clientError.isNotEmpty()) {
                 Text(text = viewModel.clientError, color = MaterialTheme.colorScheme.error)
                 Text("Please check your connection settings in the main app outside of tasker")

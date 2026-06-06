@@ -1,10 +1,11 @@
 package com.github.db1996.taskerha.tasker.ontriggerstate
 
+import com.github.db1996.taskerha.tasker.base.HasInstanceId
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
 
 @TaskerInputRoot
-class OnTriggerStateInput {
+class OnTriggerStateInput : HasInstanceId {
 
     @field:TaskerInputField("entityId")
     var entityId: String = ""
@@ -35,4 +36,7 @@ class OnTriggerStateInput {
 
     @field:TaskerInputField("configPerEntity")
     var configPerEntity: String = ""
+
+    @field:TaskerInputField("instanceId")
+    override var instanceId: String = ""
 }

@@ -59,7 +59,8 @@ class MessageBackViewModel(
         return MessageBackBuiltForm(
             blurb = "",
             type = form.type,
-            message = form.message
+            message = form.message,
+            instanceId = form.instanceId
         )
     }
 
@@ -67,7 +68,8 @@ class MessageBackViewModel(
         logVerbose("Restoring form: type=${data.type}, message=${data.message}")
         form = MessageBackForm(
             type = data.type,
-            message = data.message
+            message = data.message,
+            instanceId = data.instanceId
         )
     }
 

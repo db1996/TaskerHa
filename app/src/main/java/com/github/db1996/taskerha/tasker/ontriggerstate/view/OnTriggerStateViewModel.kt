@@ -1,19 +1,28 @@
 package com.github.db1996.taskerha.tasker.ontriggerstate.view
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaEntity
+import com.github.db1996.taskerha.datamodels.HaInstance
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.EntityTriggerConfig
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
+import com.github.db1996.taskerha.util.HaHttpClientFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 class OnTriggerStateViewModel(
+    private val context: Context,
     client: HomeAssistantClient
 ) : BaseViewModel<OnTriggerStateForm, OnTriggerStateBuiltForm>(
     initialForm = OnTriggerStateForm(),
@@ -153,6 +162,7 @@ class OnTriggerStateViewModel(
             toState = "",
             forDuration = "",
             triggerId = UUID.randomUUID().toString(),
+            instanceId = form.instanceId,
             attributeMapping = form.attributeMapping
         )
     }
@@ -196,7 +206,8 @@ class OnTriggerStateViewModel(
             entityConfigs = restoredConfigs,
             sharedConfig = restoredSharedConfig,
             configPerEntity = data.configPerEntity,
-            attributeMapping = data.attributeMapping
+            attributeMapping = data.attributeMapping,
+            instanceId = data.instanceId
         )
     }
 
@@ -215,6 +226,51 @@ class OnTriggerStateViewModel(
             entities = result
             logDebug("Loaded entities: ${entities.size}")
         }
+    }
+
+    /**
+     * Change the target instance and reload entities
+     * Only for new triggers - not for editing existing triggers
+     */
+    fun changeInstance(instanceId: String) {
+        form = form.copy(instanceId = instanceId)
+        
+        viewModelScope.launch {
+            val instance = HaInstanceRepository.getById(instanceId)
+            if (instance != null) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val newClient = createClientForInstance(instance)
+                        val success = newClient.ping()
+                        if (success) {
+                            val result = newClient.getEntities()
+                            entities = result
+                            clientError = ""
+                            logDebug("Loaded ${entities.size} entities from instance: ${instance.name}")
+                        } else {
+                            clientError = newClient.error
+                            entities = emptyList()
+                            logError("Failed to ping instance: ${newClient.error}")
+                        }
+                    } catch (e: Exception) {
+                        clientError = e.message ?: "Unknown error"
+                        entities = emptyList()
+                        logError("Error loading entities: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
+        val url = instance.resolveUrl()
+        val token = instance.token
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = instance.clientCertEnabled,
+            clientCertAlias = instance.clientCertAlias
+        )
+        return HomeAssistantClient(url, token, httpClient)
     }
 }
 

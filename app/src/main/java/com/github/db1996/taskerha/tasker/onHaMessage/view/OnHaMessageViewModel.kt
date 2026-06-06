@@ -67,7 +67,8 @@ class OnHaMessageViewModel(
         return OnHaMessageBuiltForm(
             blurb = "",
             type = form.type,
-            message = form.message
+            message = form.message,
+            instanceId = form.instanceId
         )
     }
 
@@ -75,7 +76,8 @@ class OnHaMessageViewModel(
         logVerbose("Restoring form: type=${data.type}, message=${data.message}")
         form = OnHaMessageForm(
             type = data.type,
-            message = data.message
+            message = data.message,
+            instanceId = data.instanceId
         )
     }
 

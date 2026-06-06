@@ -1,20 +1,29 @@
 package com.github.db1996.taskerha.tasker.callservice.view
 
+import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewModelScope
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaEntity
+import com.github.db1996.taskerha.datamodels.HaInstance
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
 import com.github.db1996.taskerha.tasker.callservice.data.FieldState
+import com.github.db1996.taskerha.util.HaHttpClientFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.text.orEmpty
 
 class CallServiceViewModel(
+    private val context: Context,
     client: HomeAssistantClient
 ) : BaseViewModel<CallServiceFormForm, CallServiceFormBuiltForm>(
     initialForm = CallServiceFormForm(),
@@ -118,6 +127,7 @@ class CallServiceViewModel(
             service = service,
             entityId = entityIdValue,  // @Deprecated - for old Tasker versions
             data = data,
+            instanceId = form.instanceId,
             blurb = ""
         )
     }
@@ -168,6 +178,7 @@ class CallServiceViewModel(
             domain = data.domain,
             service = data.service,
             dataContainer = restoredDataContainer,
+            instanceId = data.instanceId
         )
     }
 
@@ -192,6 +203,58 @@ class CallServiceViewModel(
             val success = client.callService(domain, service, entityId, data)
             logDebug("Service call ${if (success) "succeeded" else "failed"}")
         }
+    }
+
+    /**
+     * Change the target instance and reload services and entities
+     * Only for new actions - not for editing existing actions
+     */
+    fun changeInstance(instanceId: String) {
+        form = form.copy(instanceId = instanceId)
+        
+        viewModelScope.launch {
+            val instance = HaInstanceRepository.getById(instanceId)
+            if (instance != null) {
+                withContext(Dispatchers.IO) {
+                    try {
+                        val newClient = createClientForInstance(instance)
+                        val success = newClient.ping()
+                        if (success) {
+                            // Load services and entities
+                            val servicesList = newClient.getServicesFront()
+                            val entitiesList = newClient.getEntities()
+                            
+                            services = servicesList
+                            entities = entitiesList
+                            clientError = ""
+                            
+                            logDebug("Loaded ${services.size} services and ${entities.size} entities from instance: ${instance.name}")
+                        } else {
+                            clientError = newClient.error
+                            services = emptyList()
+                            entities = emptyList()
+                            logError("Failed to ping instance: ${newClient.error}")
+                        }
+                    } catch (e: Exception) {
+                        clientError = e.message ?: "Unknown error"
+                        services = emptyList()
+                        entities = emptyList()
+                        logError("Error loading data: ${e.message}")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
+        val url = instance.resolveUrl()
+        val token = instance.token
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = instance.clientCertEnabled,
+            clientCertAlias = instance.clientCertAlias
+        )
+        return HomeAssistantClient(url, token, httpClient)
     }
 }
 

@@ -9,6 +9,7 @@ import android.os.IBinder
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.github.db1996.taskerha.R
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.logging.LogChannel
@@ -528,12 +529,23 @@ class HaWebSocketService : Service(), BaseLogger {
         val prefs = applicationContext.getSharedPreferences("TriggerStatePrefs", Context.MODE_PRIVATE)
         val items = prefs.getStringSet("items", emptySet()) ?: emptySet()
 
+        // Get active instance ID for filtering
+        val activeInstanceId = HaInstanceRepository.activeInstanceId.value
+        val defaultInstanceId = HaInstanceRepository.getDefault()?.id
+
         val perIdGroups = mutableMapOf<String, MutableList<StateTrigger>>()
         val legacyTriggers = mutableListOf<StateTrigger>()
 
         for (raw in items) {
             runCatching {
                 val built = payloadJson.decodeFromString<OnTriggerStateBuiltForm>(raw)
+
+                // Filter by instance - only subscribe triggers for active instance
+                val triggerInstanceId = built.instanceId.ifBlank { defaultInstanceId ?: "" }
+                if (triggerInstanceId != activeInstanceId) {
+                    // Skip triggers that don't match active instance
+                    return@runCatching
+                }
 
                 val effectiveIds = if (built.entityIds.isNotEmpty()) {
                     built.entityIds.map { it.trim() }.filter { it.isNotBlank() }

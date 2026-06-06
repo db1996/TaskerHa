@@ -1,14 +1,18 @@
 package com.github.db1996.taskerha.tasker.getstate
 
+import com.github.db1996.taskerha.tasker.base.HasInstanceId
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputField
 import com.joaomgcd.taskerpluginlibrary.input.TaskerInputRoot
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputObject
 import com.joaomgcd.taskerpluginlibrary.output.TaskerOutputVariable
 
 @TaskerInputRoot
-class HaGetStateInput {
+class HaGetStateInput : HasInstanceId {
     @field:TaskerInputField("entityId")
     var entityId: String = ""
+
+    @field:TaskerInputField("instanceId")
+    override var instanceId: String = ""
 }
 
 @TaskerOutputObject

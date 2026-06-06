@@ -2,6 +2,7 @@ package com.github.db1996.taskerha.tasker.messageback
 
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackBuiltForm
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackForm
@@ -33,6 +34,7 @@ class MessageBackConfigActivity : BaseTaskerConfigActivity<
         return MessageBackInput().apply {
             type = builtForm.type
             message = builtForm.message
+            instanceId = builtForm.instanceId
         }
     }
 
@@ -40,6 +42,9 @@ class MessageBackConfigActivity : BaseTaskerConfigActivity<
         return MessageBackBuiltForm(
             type = input.type,
             message = input.message,
+            instanceId = input.instanceId.ifBlank { 
+                HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: "" 
+            },
             blurb = "Get state: ${input.type}"
         )
     }
