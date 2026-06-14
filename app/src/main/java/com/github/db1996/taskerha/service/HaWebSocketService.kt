@@ -80,6 +80,7 @@ class HaWebSocketService : Service(), BaseLogger {
 
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
+            _connectionState.value = WsConnectionState.CONNECTING
             CustomLogger.i(TAG, "Attempting to start websocket", LogChannel.WEBSOCKET)
 
             val intent = Intent(context, HaWebSocketService::class.java)
@@ -144,7 +145,14 @@ class HaWebSocketService : Service(), BaseLogger {
             return START_NOT_STICKY
         }
 
-        if (!isShuttingDown && webSocket == null && reconnectJob?.isActive != true) {
+        if (!isShuttingDown) {
+            // Always reconnect — this handles both initial start and instance switches.
+            // Cancel any pending reconnect and close the current socket so we start fresh
+            // connecting to whatever HaInstanceRepository.getActive() now points to.
+            reconnectJob?.cancel()
+            reconnectAttempts = 0
+            try { webSocket?.cancel() } catch (_: Throwable) {}
+            webSocket = null
             logInfo("Starting websocket service from onStartCommand")
             runCatching { connectWebSocket() }
                 .onFailure { t -> logError("connectWebSocket failed from onStartCommand", t) }

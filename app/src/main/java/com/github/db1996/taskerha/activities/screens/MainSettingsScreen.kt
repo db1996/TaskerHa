@@ -103,9 +103,9 @@ fun MainSettingsScreen(
             HaInstanceRepository.update(old.copy(wsEnabled = false))
         }
         HaInstanceRepository.update(instance.copy(wsEnabled = true))
-        HaInstanceRepository.setActive(instance.id)
         HaSettings.saveWebSocketEnabled(context, true)
         HaWebSocketService.start(context)
+        HaInstanceRepository.setActive(instance.id)
     }
 
     fun disableWs(instance: HaInstance) {
