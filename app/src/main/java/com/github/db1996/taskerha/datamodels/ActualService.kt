@@ -10,5 +10,6 @@ data class ActualService(
     @Deprecated("Migrated to synthetic entity_id field")
     val targetEntity: Boolean,
     @Deprecated("Migrated to multipleEntities property on entity_id field")
-    val broadEntityTarget: Boolean = false
+    val broadEntityTarget: Boolean = false,
+    val hasTargetDefinition: Boolean = false
 )

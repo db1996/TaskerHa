@@ -29,23 +29,35 @@ class CallServiceRunner : BaseTaskerRunner<CallServiceInput, CallServiceOutput>(
             }
 
 
-            val dataMap = try {
+            val dataMap: Map<String, String> = try {
                 Json.Default.decodeFromString(
                     MapSerializer(String.serializer(), String.serializer()),
                     input.dataJson
-                ).mapValues { it.value as Any }
+                )
             } catch (e: Exception) {
                 logError("Invalid JSON Data: ${e.message}", e)
                 return RunnerResult.Error(ErrorCodes.ERROR_CODE_API_ERROR, client.error)
             }
 
+            val targetKeys = setOf("entity_id", "device_id", "area_id", "label_id")
+            val hasTargetKeys = targetKeys.any { dataMap.getOrDefault(it, "").isNotBlank() }
+
             logInfo("Calling service: ${input.domain}.${input.service} on entity: ${input.entityId}")
-            val ok = client.callService(
-                input.domain,
-                input.service,
-                input.entityId,
-                dataMap
-            )
+            val ok = if (hasTargetKeys) {
+                fun csv(key: String): List<String> =
+                    dataMap.getOrDefault(key, "").split(",").filter { it.isNotBlank() }
+                val target = mutableMapOf<String, List<String>>()
+                csv("entity_id").takeIf { it.isNotEmpty() }?.let { target["entity_id"] = it }
+                csv("device_id").takeIf { it.isNotEmpty() }?.let { target["device_id"] = it }
+                csv("area_id").takeIf { it.isNotEmpty() }?.let { target["area_id"] = it }
+                csv("label_id").takeIf { it.isNotEmpty() }?.let { target["label_id"] = it }
+                val cleanData: Map<String, Any> = dataMap.filterKeys { it !in targetKeys }
+                client.callService(input.domain, input.service, target = target, data = cleanData)
+            } else {
+                val entityId = input.entityId.ifEmpty { dataMap.getOrDefault("entity_id", "") }
+                val cleanData: Map<String, Any> = dataMap.filterKeys { it != "entity_id" }
+                client.callService(input.domain, input.service, entityId, cleanData)
+            }
 
             if (!ok) {
                 logError("Failed calling service: ${client.error}")

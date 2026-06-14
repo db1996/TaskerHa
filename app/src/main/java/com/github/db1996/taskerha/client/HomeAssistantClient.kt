@@ -3,6 +3,7 @@ package com.github.db1996.taskerha.client
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaDomainService
 import com.github.db1996.taskerha.datamodels.HaEntity
+import com.github.db1996.taskerha.datamodels.HaRegistryData
 import com.github.db1996.taskerha.datamodels.HaService
 import com.github.db1996.taskerha.datamodels.HaServiceField
 import com.github.db1996.taskerha.datamodels.Option
@@ -50,6 +51,7 @@ class HomeAssistantClient(
     var result: String = ""
     private var services: List<HaDomainService> = emptyList()
     private var entities: List<HaEntity> = emptyList()
+    private var registryData: HaRegistryData? = null
 
     init {
         validateSettings()
@@ -199,6 +201,25 @@ class HomeAssistantClient(
         }
     }
 
+    suspend fun getRegistryData(force: Boolean = false): HaRegistryData? =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext null
+            if (registryData != null && !force) return@withContext registryData
+
+            try {
+                val body = "{}"
+                val response = http.newCall(
+                    request("/api/services/taskerha_companion/get_registry_data?return_response", body)
+                ).execute()
+                val responseBody = response.body?.string()
+                if (!response.isSuccessful || responseBody == null) return@withContext null
+                registryData = json.decodeFromString<HaRegistryData>(responseBody)
+                registryData
+            } catch (e: Exception) {
+                null
+            }
+        }
+
     suspend fun getState(entityId: String): Boolean =
         withContext(Dispatchers.IO) {
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
@@ -238,20 +259,30 @@ class HomeAssistantClient(
             }
         }
 
-    suspend fun callService(domain: String, service: String, entityId: String, data: Map<String, Any>? = null): Boolean =
-        withContext(Dispatchers.IO) {
+    suspend fun callService(
+        domain: String,
+        service: String,
+        entityId: String = "",
+        data: Map<String, Any>? = null,
+        target: Map<String, List<String>>? = null
+    ): Boolean = withContext(Dispatchers.IO) {
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
 
-            val payload = mutableMapOf<String, Any>()
-            if (entityId.isNotEmpty()) payload["entity_id"] = entityId
-            data?.let { payload.putAll(it) }
+            val rootPayload = mutableMapOf<String, JsonElement>()
 
-            logVerbose("Payload: $payload")
+            if (target != null) {
+                target.filterValues { it.isNotEmpty() }.forEach { (key, ids) ->
+                    rootPayload[key] = JsonArray(ids.map { JsonPrimitive(it) })
+                }
+            } else if (entityId.isNotEmpty()) {
+                rootPayload["entity_id"] = JsonPrimitive(entityId)
+            }
 
-            val body = json.encodeToString(
-                MapSerializer(String.serializer(), JsonElement.serializer()),
-                payload.mapValues { JsonPrimitive(it.value.toString()) }
-            )
+            data?.forEach { (key, value) -> rootPayload[key] = JsonPrimitive(value.toString()) }
+
+            logVerbose("Payload: $rootPayload")
+
+            val body = json.encodeToString(JsonObject.serializer(), JsonObject(rootPayload))
 
             val req = request("/api/services/$domain/$service", body)
             logVerbose("url: ${req.url}")
@@ -324,6 +355,8 @@ class HomeAssistantClient(
         // Extract domain filter from target.entity[].domain[]
         val targetDomain = extractTargetDomain(haService.target, domain)
 
+        val hasTargetDefinition = haService.target != null
+
         val actualService = ActualService(
             id = serviceId,
             name = haService.name,
@@ -333,6 +366,7 @@ class HomeAssistantClient(
             fields = mutableListOf(),
             targetEntity = hasEntityTarget,
             broadEntityTarget = broadTarget,
+            hasTargetDefinition = hasTargetDefinition
         )
 
 
@@ -345,21 +379,21 @@ class HomeAssistantClient(
         if (hasEntityTarget && actualService.fields.none { it.id == "entity_id" }) {
             val syntheticEntityField = HaServiceField(
                 id = "entity_id",
-                name = if (broadTarget) "Entities" else "Entity",
+                name = "Entities",
                 description = "Target entity for this service",
                 required = true,
                 type = HaServiceFieldType.STATE,
-                multipleEntities = broadTarget,
+                multipleEntities = true,
                 domain = targetDomain
             )
             actualService.fields.add(0, syntheticEntityField)  // Prepend to top
         } else if (hasEntityTarget) {
-            // If explicit entity_id field exists, mark it with multipleEntities flag
+            // If explicit entity_id field exists, always allow multiple and set domain
             actualService.fields.find { it.id == "entity_id" }?.let { field ->
-                field.multipleEntities = broadTarget
+                field.multipleEntities = true
                 field.domain = targetDomain
                 if (field.name.isNullOrBlank()) {
-                    field.name = if (broadTarget) "Entities" else "Entity"
+                    field.name = "Entities"
                 }
             }
         }

@@ -11,6 +11,7 @@ import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaEntity
 import com.github.db1996.taskerha.datamodels.HaInstance
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
+import com.github.db1996.taskerha.datamodels.HaRegistryData
 import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
@@ -39,10 +40,17 @@ class CallServiceViewModel(
         private set
 
     var selectedService: ActualService? by mutableStateOf(null)
+    var registryData: HaRegistryData? by mutableStateOf(null)
+        private set
+    var registryLoading: Boolean by mutableStateOf(false)
+        private set
 
     var currentDomainSearch: String by mutableStateOf("")
     var currentServiceSearch: String by mutableStateOf("")
     var pendingRestore: CallServiceFormBuiltForm? = null
+
+    val hacsAvailable: Boolean
+        get() = HaInstanceRepository.getById(form.instanceId)?.hacsAvailable ?: false
 
     override val logTag: String
         get() =  "CallServiceViewModel"
@@ -71,7 +79,7 @@ class CallServiceViewModel(
 
     fun pickService(pservice: ActualService) {
         selectedService = pservice
-        form = CallServiceFormForm()
+        form = CallServiceFormForm(instanceId = form.instanceId)
 
         form.domain = pservice.domain
         form.service = pservice.id
@@ -85,9 +93,27 @@ class CallServiceViewModel(
                 form.dataContainer[field.id]?.toggle?.value = true
             }
         }
+
+        if (pservice.hasTargetDefinition) {
+            ensureTargetKeys()
+            launchClientOperation { client ->
+                registryLoading = true
+                registryData = client.getRegistryData()
+                registryLoading = false
+            }
+        }
+
         Log.d("HA", "Picked service: ${pservice.id}, fields: ${pservice.fields.size}, form: ${form.domain}, form: ${form.service}")
         Log.d("HA", "Form data: ${form.dataContainer}")
 
+    }
+
+    private fun ensureTargetKeys() {
+        for (key in listOf("device_id", "area_id", "label_id")) {
+            if (!form.dataContainer.containsKey(key)) {
+                form.dataContainer[key] = FieldState()
+            }
+        }
     }
 
     fun unsetPickedService() {
@@ -116,11 +142,14 @@ class CallServiceViewModel(
     override fun buildForm(): CallServiceFormBuiltForm {
         val domain = form.domain
         val service = form.service
-        
+
+        val targetKeys = setOf("entity_id", "device_id", "area_id", "label_id")
         val data = form.dataContainer
-            .filter { it.value.toggle.value }
+            .filter { (key, state) ->
+                state.toggle.value || (key in targetKeys && state.value.value.isNotBlank())
+            }
             .mapValues { it.value.value.value }
-        
+
         // For backward compatibility, populate legacy entityId field from dataContainer["entity_id"]
         val entityIdValue = data.getOrDefault("entity_id", "")
 
@@ -171,9 +200,28 @@ class CallServiceViewModel(
                 entityState.toggle.value = true
             }
         }
-        
+
+        // Restore synthetic target keys for services with target definition
+        if (pservice.hasTargetDefinition) {
+            for (key in listOf("entity_id", "device_id", "area_id", "label_id")) {
+                val state = restoredDataContainer.getOrPut(key) { FieldState() }
+                if (data.data.containsKey(key)) {
+                    state.value.value = data.data[key].orEmpty()
+                    state.toggle.value = true
+                }
+            }
+        }
+
         logDebug("Restoring form: ${data.domain}, ${data.service}, ${data.entityId},")
         selectedService = pservice
+
+        if (pservice.hasTargetDefinition) {
+            launchClientOperation { client ->
+                registryLoading = true
+                registryData = client.getRegistryData()
+                registryLoading = false
+            }
+        }
 
         form = CallServiceFormForm(
             entityId = data.entityId,  // Keep for display purposes during migration
@@ -202,7 +250,21 @@ class CallServiceViewModel(
             .mapValues { it.value.value.value }
 
         launchClientOperation { client ->
-            val success = client.callService(domain, service, entityId, data)
+            val targetKeys = setOf("entity_id", "device_id", "area_id", "label_id")
+            val hasTargetKeys = targetKeys.any { data.getOrDefault(it, "").isNotBlank() }
+            val success = if (hasTargetKeys) {
+                fun csv(key: String) = data.getOrDefault(key, "").split(",").filter { it.isNotBlank() }
+                val target = buildMap {
+                    csv("entity_id").takeIf { it.isNotEmpty() }?.let { put("entity_id", it) }
+                    csv("device_id").takeIf { it.isNotEmpty() }?.let { put("device_id", it) }
+                    csv("area_id").takeIf { it.isNotEmpty() }?.let { put("area_id", it) }
+                    csv("label_id").takeIf { it.isNotEmpty() }?.let { put("label_id", it) }
+                }
+                val cleanData = data.filterKeys { it !in targetKeys }
+                client.callService(domain, service, target = target, data = cleanData)
+            } else {
+                client.callService(domain, service, entityId, data)
+            }
             logDebug("Service call ${if (success) "succeeded" else "failed"}")
         }
     }
