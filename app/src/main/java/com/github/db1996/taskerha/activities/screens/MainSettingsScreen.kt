@@ -13,10 +13,14 @@ import android.provider.Settings
 import android.security.KeyChain
 import android.widget.Toast
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import com.github.db1996.taskerha.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -27,6 +31,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -34,6 +40,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Warning
@@ -1484,6 +1491,50 @@ private fun OptionsTab() {
                 )
             }
         }
+
+        // About section
+        Text(
+            "About",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AboutLinkRow(
+                    label = "Documentation",
+                    url = "https://github.com/db1996/TaskerHa"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AboutLinkRow(
+                    label = "Report bug or feature request",
+                    url = "https://github.com/db1996/TaskerHa/issues"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AboutLinkRow(
+                    label = "Install companion HACS integration",
+                    url = "https://github.com/db1996/taskerha-hacs"
+                )
+            }
+        }
+
+        // Buy Me a Coffee button
+        Button(
+            onClick = {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, "https://buymeacoffee.com/db1996".toUri())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDD00)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "☕  Buy me a coffee",
+                color = Color(0xFF000000),
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 
     if (showBatteryDialog) {
@@ -1620,6 +1671,42 @@ fun hasWsPopupDismissed(context: Context): Boolean {
 fun setWsPopupDismissed(context: Context) {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     prefs.edit { putBoolean(KEY_WS_POPUP_DISMISSED, true) }
+}
+
+@Composable
+private fun AboutLinkRow(label: String, url: String) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, url.toUri())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_github),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Rounded.OpenInNew,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 fun openAppBatterySettings(context: Context) {
