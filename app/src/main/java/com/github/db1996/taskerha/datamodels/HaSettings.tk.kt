@@ -29,6 +29,9 @@ object HaSettings {
     private const val KEY_CLIENT_CERT_ENABLED = "client_cert_enabled"
     private const val KEY_CLIENT_CERT_ALIAS = "client_cert_alias"
 
+    // Global request timeout
+    private const val KEY_REQUEST_TIMEOUT = "request_timeout"
+
     fun save(context: Context, url: String, token: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit {
@@ -173,6 +176,16 @@ object HaSettings {
             .getString(key, null)
 
         return LogLevel.fromString(raw, def)
+    }
+
+    fun saveRequestTimeout(context: Context, seconds: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit { putInt(KEY_REQUEST_TIMEOUT, seconds) }
+    }
+
+    fun loadRequestTimeout(context: Context): Int {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt(KEY_REQUEST_TIMEOUT, 5)
     }
 }
 

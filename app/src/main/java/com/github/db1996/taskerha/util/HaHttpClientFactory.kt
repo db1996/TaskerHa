@@ -36,10 +36,11 @@ object HaHttpClientFactory {
         clientCertAlias: String = HaSettings.loadClientCertAlias(context),
         configure: (OkHttpClient.Builder) -> Unit = {}
     ): OkHttpClient {
+        val timeoutSeconds = HaSettings.loadRequestTimeout(context).toLong()
         val builder = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
         configure(builder)
 
         if (clientCertEnabled) {

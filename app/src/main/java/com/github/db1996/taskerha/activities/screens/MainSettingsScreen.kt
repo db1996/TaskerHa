@@ -8,9 +8,15 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.security.KeyChain
 import android.widget.Toast
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -63,6 +69,7 @@ import kotlinx.coroutines.withContext
 private enum class SettingsTab(val label: String) {
     INSTANCES("Instances"),
     TRIGGERS("Triggers"),
+    OPTIONS("Options"),
     LOGGING("Logging"),
 }
 
@@ -267,6 +274,8 @@ fun MainSettingsScreen(
                         context.startActivity(chooser)
                     }
                 )
+
+                SettingsTab.OPTIONS -> OptionsTab()
 
                 SettingsTab.TRIGGERS -> ActiveTriggersTab()
             }
@@ -1330,6 +1339,175 @@ private fun WsInfoDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun OptionsTab() {
+    val context = LocalContext.current
+
+    // Notification permission
+    var hasNotifPermission by remember { mutableStateOf(hasNotificationPermission(context)) }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasNotifPermission = granted
+    }
+
+    // Battery optimization — refresh status on every resume so the card updates after returning from settings
+    val pm = context.getSystemService(PowerManager::class.java)
+    var ignoringBattery by remember {
+        mutableStateOf(pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false)
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                ignoringBattery = pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    var showBatteryDialog by remember { mutableStateOf(false) }
+
+
+    // Request timeout — track raw text so the field is editable mid-type
+    var timeoutText by remember { mutableStateOf(HaSettings.loadRequestTimeout(context).toString()) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            "General",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        // Notification permission card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Notifications", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (hasNotifPermission) "Permission granted" else "Permission not granted",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (hasNotifPermission) Color(0xFF4CAF50) else Color(0xFFFFA000)
+                    )
+                }
+                if (hasNotifPermission) {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50)
+                    )
+                } else {
+                    Switch(
+                        checked = false,
+                        onCheckedChange = {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+
+        // Battery optimization card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Battery optimization", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (ignoringBattery) "Unrestricted" else "Restricted",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (ignoringBattery) Color(0xFF4CAF50) else Color(0xFFFFA000)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        IconButton(onClick = { showBatteryDialog = true }) {
+                            Icon(Icons.Rounded.Info, contentDescription = "Info")
+                        }
+                        OutlinedButton(onClick = { openAppBatterySettings(context) }) {
+                            Text("Open settings")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Request timeout card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Request timeout", style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(
+                    value = timeoutText,
+                    onValueChange = { raw ->
+                        // Allow only digits, cap at 4 chars to prevent absurd values
+                        val filtered = raw.filter { it.isDigit() }.take(4)
+                        timeoutText = filtered
+                        val v = filtered.toIntOrNull()
+                        if (v != null && v >= 1) {
+                            HaSettings.saveRequestTimeout(context, v)
+                        }
+                    },
+                    label = { Text("Seconds") },
+                    suffix = { Text("s") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Applies to all Home Assistant connections. Default: 5s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+
+    if (showBatteryDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatteryDialog = false },
+            title = { Text("Battery optimization") },
+            text = {
+                Text(
+                    "Android may restrict background services to save battery. " +
+                    "For reliable WebSocket triggers, set TaskerHA to Unrestricted in battery settings.\n\n" +
+                    "Current status: ${if (ignoringBattery) "Unrestricted ✓" else "Restricted"}"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBatteryDialog = false
+                    openAppBatterySettings(context)
+                }) { Text("Open settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatteryDialog = false }) { Text("Close") }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
