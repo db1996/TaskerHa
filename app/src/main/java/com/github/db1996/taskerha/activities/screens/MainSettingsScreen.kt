@@ -659,6 +659,7 @@ private fun InstanceEditorDialog(
     var localUrl by remember { mutableStateOf(instance.localUrl) }
     var token by remember { mutableStateOf(instance.token) }
     var homeSsids by remember { mutableStateOf(instance.homeSsids) }
+    var localUrlEnabled by remember { mutableStateOf(instance.localUrl.isNotBlank() || instance.homeSsids.isNotEmpty()) }
     var clientCertEnabled by remember { mutableStateOf(instance.clientCertEnabled) }
     var clientCertAlias by remember { mutableStateOf(instance.clientCertAlias) }
     var hacsAvailable by remember { mutableStateOf(instance.hacsAvailable) }
@@ -777,10 +778,11 @@ private fun InstanceEditorDialog(
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
                 LocalUrlSection(
-                    enabled = localUrl.isNotBlank() || homeSsids.isNotEmpty(),
+                    enabled = localUrlEnabled,
                     localUrl = localUrl,
                     homeSsids = homeSsids,
                     onEnabledChange = { enabled ->
+                        localUrlEnabled = enabled
                         if (!enabled) {
                             localUrl = ""
                             homeSsids = emptySet()
@@ -791,7 +793,7 @@ private fun InstanceEditorDialog(
                 )
 
                 val canTestLocal = testingLabel == null && localUrl.isNotBlank() && token.isNotBlank()
-                if (localUrl.isNotBlank()) {
+                if (localUrlEnabled && localUrl.isNotBlank()) {
                     Button(
                         enabled = canTestLocal,
                         onClick = { runTest("Local", localUrl) }
