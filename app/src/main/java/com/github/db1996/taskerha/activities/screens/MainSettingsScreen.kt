@@ -1357,6 +1357,9 @@ private fun OptionsTab() {
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasNotifPermission = granted
     }
+    var showDisableNotifDialog by remember { mutableStateOf(false) }
+
+    val instances by HaInstanceRepository.instances.collectAsState()
 
     // Battery optimization — refresh status on every resume so the card updates after returning from settings
     val pm = context.getSystemService(PowerManager::class.java)
@@ -1368,6 +1371,7 @@ private fun OptionsTab() {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 ignoringBattery = pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+                hasNotifPermission = hasNotificationPermission(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -1403,22 +1407,18 @@ private fun OptionsTab() {
                         color = if (hasNotifPermission) Color(0xFF4CAF50) else Color(0xFFFFA000)
                     )
                 }
-                if (hasNotifPermission) {
-                    Icon(
-                        Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF4CAF50)
-                    )
-                } else {
-                    Switch(
-                        checked = false,
-                        onCheckedChange = {
+                Switch(
+                    checked = hasNotifPermission,
+                    onCheckedChange = { on ->
+                        if (on) {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }
+                        } else {
+                            showDisableNotifDialog = true
                         }
-                    )
-                }
+                    }
+                )
             }
         }
 
@@ -1443,17 +1443,15 @@ private fun OptionsTab() {
                             color = if (ignoringBattery) Color(0xFF4CAF50) else Color(0xFFFFA000)
                         )
                     }
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        IconButton(onClick = { showBatteryDialog = true }) {
-                            Icon(Icons.Rounded.Info, contentDescription = "Info")
-                        }
-                        OutlinedButton(onClick = { openAppBatterySettings(context) }) {
-                            Text("Open settings")
-                        }
+                    IconButton(onClick = { showBatteryDialog = true }) {
+                        Icon(Icons.Rounded.Info, contentDescription = "Info")
                     }
+                }
+                OutlinedButton(
+                    onClick = { openAppBatterySettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open settings")
                 }
             }
         }
@@ -1483,6 +1481,11 @@ private fun OptionsTab() {
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Time a single request has to reach Home Assistant, set this higher if you have a slower connection. You can set it lower if you have fast connections but this could result in more reconnections of the websocket",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     "Applies to all Home Assistant connections. Default: 5s",
@@ -1535,6 +1538,41 @@ private fun OptionsTab() {
                 fontWeight = FontWeight.Bold
             )
         }
+    }
+
+    if (showDisableNotifDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisableNotifDialog = false },
+            title = { Text("Disable notifications?") },
+            text = {
+                Text(
+                    "Notification permission is required for the WebSocket background service. " +
+                    "Disabling it will stop WebSocket triggers.\n\n" +
+                    "You will be taken to app settings to revoke the permission."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDisableNotifDialog = false
+                    // Disable WS for all instances
+                    instances.filter { it.wsEnabled }.forEach { inst ->
+                        HaInstanceRepository.update(inst.copy(wsEnabled = false))
+                    }
+                    HaSettings.saveWebSocketEnabled(context, false)
+                    HaWebSocketService.stop(context)
+                    // Open notification settings so user can revoke the permission
+                    context.startActivity(
+                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    )
+                }) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisableNotifDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showBatteryDialog) {
