@@ -44,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.partials.InstanceConnectionStatus
 import com.github.db1996.taskerha.activities.partials.InstanceSelector
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
@@ -105,30 +106,33 @@ fun OnTriggerStateScreen(
                 )
             }
 
-            if (viewModel.clientError.isNotEmpty()) {
-                Text(text = viewModel.clientError, color = MaterialTheme.colorScheme.error)
-                Text("Please check your connection settings in the main app outside of tasker")
-            }
-
             if (entityAdding) {
-                TextField(
-                    value = viewModel.currentDomainSearch,
-                    onValueChange = { viewModel.currentDomainSearch = it },
-                    label = { Text("Filter domain") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                EntitySelector(
-                    entities = viewModel.entities,
-                    serviceDomain = viewModel.currentDomainSearch,
-                    currentEntityId = "",
-                    searching = true,
-                    onSearchChanged = { if (!it) entityAdding = false },
-                    onEntitySelected = { id ->
-                        viewModel.addEntity(id)
-                        entityAdding = false
-                    },
-                    onEntityIdChanged = {}
-                )
+                InstanceConnectionStatus(
+                    isLoading = viewModel.isLoadingInstance,
+                    error = viewModel.clientError,
+                    onRetry = viewModel::retryLoad
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        TextField(
+                            value = viewModel.currentDomainSearch,
+                            onValueChange = { viewModel.currentDomainSearch = it },
+                            label = { Text("Filter domain") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        EntitySelector(
+                            entities = viewModel.entities,
+                            serviceDomain = viewModel.currentDomainSearch,
+                            currentEntityId = "",
+                            searching = true,
+                            onSearchChanged = { if (!it) entityAdding = false },
+                            onEntitySelected = { id ->
+                                viewModel.addEntity(id)
+                                entityAdding = false
+                            },
+                            onEntityIdChanged = {}
+                        )
+                    }
+                }
             } else {
                 // Entity ID list
                 form.entityIds.forEachIndexed { index, entityId ->

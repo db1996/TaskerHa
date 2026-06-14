@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.partials.InstanceConnectionStatus
 import com.github.db1996.taskerha.activities.partials.InstanceSelector
 import com.github.db1996.taskerha.activities.partials.ServiceSelector
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
@@ -70,85 +71,84 @@ fun CallServiceScreen(
                 )
             }
 
-            if (viewModel.clientError != "") {
-                Text(viewModel.clientError, color = MaterialTheme.colorScheme.error)
+            InstanceConnectionStatus(
+                isLoading = viewModel.isLoadingInstance,
+                error = viewModel.clientError,
+                onRetry = viewModel::retryLoad
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = { viewModel.unsetPickedService() }) {
+                        Text("Reset domain/service")
+                    }
 
-                Text("Please check your connection settings in the main app outside of tasker")
-            }
+                    // --- If no service selected → show selector
+                    if (viewModel.selectedService == null && viewModel.services.isNotEmpty()) {
+                        ServiceSelector(
+                            services = viewModel.services,
+                            onSelect = { service -> viewModel.pickService(service) },
+                            currentDomainSearch = viewModel.currentDomainSearch,
+                            currentServiceSearch = viewModel.currentServiceSearch,
+                            onDomainSearch = { viewModel.currentDomainSearch = it },
+                            onServiceSearch = { viewModel.currentServiceSearch = it }
+                        )
+                    }
 
-            Button(onClick = { viewModel.unsetPickedService() }) {
-                Text("Reset domain/service")
-            }
-            // --- If no service selected → show selector
-            if (viewModel.selectedService == null && viewModel.services.isNotEmpty()) {
-                ServiceSelector(
-                    services = viewModel.services,
-                    onSelect = { service -> viewModel.pickService(service) },
-                    currentDomainSearch = viewModel.currentDomainSearch,
-                    currentServiceSearch = viewModel.currentServiceSearch,
-                    onDomainSearch = { viewModel.currentDomainSearch = it },
-                    onServiceSearch = { viewModel.currentServiceSearch = it }
-                )
-            }
+                    // --- If a service is selected → show details
+                    viewModel.selectedService?.let { service ->
+                        Text("Domain: ${service.domain}", style = MaterialTheme.typography.labelMedium)
+                        Text("Service: ${service.id}", style = MaterialTheme.typography.labelMedium)
 
-            // --- If a service is selected → show details
-            viewModel.selectedService?.let { service ->
-                Text("Domain: ${service.domain}", style = MaterialTheme.typography.labelMedium)
-                Text("Service: ${service.id}", style = MaterialTheme.typography.labelMedium)
-
-                // Show EntitySelector for STATE-type fields (entity_id parameters)
-                fieldEntitySearching?.let { fieldId ->
-                    service.fields.find { it.id == fieldId }?.let { field ->
-                        form.dataContainer[fieldId]?.let { state ->
-                            if (state.value.value.isNotBlank()) {
-                                Text(
-                                    "${field.name ?: field.id}: ${state.value.value}",
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                            }
-                            EntitySelector(
-                                entities = viewModel.entities,
-                                serviceDomain = field.domain ?: "",
-                                currentEntityId = state.value.value,
-                                searching = true,
-                                onSearchChanged = { searching ->
-                                    if (!searching) fieldEntitySearching = null
-                                },
-                                onEntitySelected = { entityId ->
-                                    if (field.multipleEntities) {
-                                        // Append to comma-separated list
-                                        val current = state.value.value
-                                        val newValue = if (current.isBlank()) entityId 
-                                                      else "$current,$entityId"
-                                        viewModel.updateFieldValue(fieldId, newValue)
-                                    } else {
-                                        // Replace single entity
-                                        viewModel.updateFieldValue(fieldId, entityId)
+                        fieldEntitySearching?.let { fieldId ->
+                            service.fields.find { it.id == fieldId }?.let { field ->
+                                form.dataContainer[fieldId]?.let { state ->
+                                    if (state.value.value.isNotBlank()) {
+                                        Text(
+                                            "${field.name ?: field.id}: ${state.value.value}",
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
                                     }
-                                    fieldEntitySearching = null
-                                },
-                                onEntityIdChanged = { entityId ->
-                                    viewModel.updateFieldValue(fieldId, entityId)
+                                    EntitySelector(
+                                        entities = viewModel.entities,
+                                        serviceDomain = field.domain ?: "",
+                                        currentEntityId = state.value.value,
+                                        searching = true,
+                                        onSearchChanged = { searching ->
+                                            if (!searching) fieldEntitySearching = null
+                                        },
+                                        onEntitySelected = { entityId ->
+                                            if (field.multipleEntities) {
+                                                val current = state.value.value
+                                                val newValue = if (current.isBlank()) entityId
+                                                              else "$current,$entityId"
+                                                viewModel.updateFieldValue(fieldId, newValue)
+                                            } else {
+                                                viewModel.updateFieldValue(fieldId, entityId)
+                                            }
+                                            fieldEntitySearching = null
+                                        },
+                                        onEntityIdChanged = { entityId ->
+                                            viewModel.updateFieldValue(fieldId, entityId)
+                                        }
+                                    )
                                 }
-                            )
+                            }
+                        }
+
+                        if (fieldEntitySearching == null) {
+                            service.fields.forEach { field ->
+                                form.dataContainer[field.id]?.let { state ->
+                                    FieldInput(
+                                        field = field,
+                                        state = state,
+                                        onValueChange = { viewModel.updateFieldValue(field.id, it) },
+                                        onToggleChange = { viewModel.updateFieldToggle(field.id, it) },
+                                        onEntitySearch = { fieldEntitySearching = field.id }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-
-                if (fieldEntitySearching == null) {
-                    service.fields.forEach { field ->
-                        form.dataContainer[field.id]?.let { state ->
-                            FieldInput(
-                                field = field,
-                                state = state,
-                                onValueChange = { viewModel.updateFieldValue(field.id, it) },
-                                onToggleChange = { viewModel.updateFieldToggle(field.id, it) },
-                                onEntitySearch = { fieldEntitySearching = field.id }
-                            )
-                        }
-                    }
-                }
-
             }
         }
     }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseViewModel
 import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackForm
@@ -12,7 +13,9 @@ import com.github.db1996.taskerha.tasker.messageback.data.MessageBackBuiltForm
 class MessageBackViewModel(
     client: HomeAssistantClient
 ) : BaseViewModel<MessageBackForm, MessageBackBuiltForm>(
-    initialForm = MessageBackForm(),
+    initialForm = MessageBackForm(
+        instanceId = HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
+    ),
     client = client
 ) {
     override val logTag: String
@@ -79,6 +82,10 @@ class MessageBackViewModel(
 
     override fun validateForm(): ValidationResult {
         return ValidationResult.Valid
+    }
+
+    fun changeInstance(instanceId: String) {
+        form = form.copy(instanceId = instanceId)
     }
 }
 

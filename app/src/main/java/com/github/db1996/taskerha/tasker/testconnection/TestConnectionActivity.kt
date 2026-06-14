@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.github.db1996.taskerha.activities.partials.InstanceSelector
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
 import com.joaomgcd.taskerpluginlibrary.config.TaskerPluginConfig
@@ -22,34 +23,52 @@ class TestConnectionActivity : AppCompatActivity(), TaskerPluginConfig<TestConne
 
     private val helper by lazy { TestConnectionHelper(this) }
 
+    private val selectedInstanceIdState = mutableStateOf("")
+
+    override fun assignFromInput(input: TaskerInput<TestConnectionInput>) {
+        val saved = input.regular.instanceId
+        selectedInstanceIdState.value = saved.ifBlank {
+            HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
+        }
+    }
+
+    override val inputForTasker: TaskerInput<TestConnectionInput>
+        get() = TaskerInput(TestConnectionInput().apply {
+            instanceId = selectedInstanceIdState.value.ifBlank {
+                HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
+            }
+        })
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Default to active instance; assignFromInput will override for existing configs
+        selectedInstanceIdState.value =
+            HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
 
         helper.onCreate()
 
         setContent {
             TaskerHaTheme {
+                val selectedInstanceId by selectedInstanceIdState
+                val instances by HaInstanceRepository.instances.collectAsState()
+
                 TestConnectionScreen(
-                    onFinish = {
-                        helper.finishForTasker()
-                    }
+                    instances = instances,
+                    selectedInstanceId = selectedInstanceId,
+                    onInstanceSelected = { selectedInstanceIdState.value = it },
+                    onFinish = { helper.finishForTasker() }
                 )
             }
         }
     }
-
-    override fun assignFromInput(input: TaskerInput<TestConnectionInput>) {
-        // No configuration to restore
-    }
-
-    override val inputForTasker: TaskerInput<TestConnectionInput>
-        get() = TaskerInput(TestConnectionInput().apply {
-            instanceId = HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
-        })
 }
 
 @Composable
 private fun TestConnectionScreen(
+    instances: List<com.github.db1996.taskerha.datamodels.HaInstance>,
+    selectedInstanceId: String,
+    onInstanceSelected: (String) -> Unit,
     onFinish: () -> Unit
 ) {
     Scaffold(
@@ -71,6 +90,14 @@ private fun TestConnectionScreen(
                 text = "This action will test connectivity to your Home Assistant instance and return the results.",
                 style = MaterialTheme.typography.bodyMedium
             )
+
+            if (instances.isNotEmpty()) {
+                InstanceSelector(
+                    instances = instances,
+                    selectedInstanceId = selectedInstanceId,
+                    onInstanceSelected = onInstanceSelected
+                )
+            }
 
             Spacer(Modifier.weight(1f))
 

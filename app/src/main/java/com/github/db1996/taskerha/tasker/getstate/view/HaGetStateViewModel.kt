@@ -22,7 +22,9 @@ class HaGetStateViewModel(
     private val context: Context,
     client: HomeAssistantClient
 ) : BaseViewModel<HaGetStateForm, HaGetStateBuiltForm>(
-    initialForm = HaGetStateForm(),
+    initialForm = HaGetStateForm(
+        instanceId = HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
+    ),
     client = client
 ) {
 
@@ -90,38 +92,46 @@ class HaGetStateViewModel(
     }
 
     /**
-     * Change the target instance and reload entities
-     * Only for new actions - not for editing existing actions
+     * Change the target instance and reload entities.
+     * Only for new actions - not for editing existing actions.
      */
     fun changeInstance(instanceId: String) {
         form = form.copy(instanceId = instanceId)
-        
+        entities = emptyList()
+        clientError = ""
+        isLoadingInstance = true
+
         viewModelScope.launch {
-            val instance = HaInstanceRepository.getById(instanceId)
-            if (instance != null) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val newClient = createClientForInstance(instance)
-                        val success = newClient.ping()
-                        if (success) {
-                            val result = newClient.getEntities()
-                            entities = result
-                            clientError = ""
-                            logDebug("Loaded ${entities.size} entities from instance: ${instance.name}")
-                        } else {
-                            clientError = newClient.error
-                            entities = emptyList()
-                            logError("Failed to ping instance: ${newClient.error}")
+            try {
+                val instance = HaInstanceRepository.getById(instanceId)
+                if (instance != null) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val newClient = createClientForInstance(instance)
+                            val success = newClient.ping()
+                            if (success) {
+                                entities = newClient.getEntities()
+                                clientError = ""
+                                logDebug("Loaded ${entities.size} entities from instance: ${instance.name}")
+                            } else {
+                                clientError = newClient.error
+                                logError("Failed to ping instance: ${newClient.error}")
+                            }
+                        } catch (e: Exception) {
+                            clientError = e.message ?: "Unknown error"
+                            logError("Error loading entities: ${e.message}")
                         }
-                    } catch (e: Exception) {
-                        clientError = e.message ?: "Unknown error"
-                        entities = emptyList()
-                        logError("Error loading entities: ${e.message}")
                     }
+                } else {
+                    clientError = "Instance not found"
                 }
+            } finally {
+                isLoadingInstance = false
             }
         }
     }
+
+    fun retryLoad() = changeInstance(form.instanceId)
 
     private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
         val url = instance.resolveUrl()

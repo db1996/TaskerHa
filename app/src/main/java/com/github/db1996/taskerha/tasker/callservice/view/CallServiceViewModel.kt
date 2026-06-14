@@ -26,7 +26,9 @@ class CallServiceViewModel(
     private val context: Context,
     client: HomeAssistantClient
 ) : BaseViewModel<CallServiceFormForm, CallServiceFormBuiltForm>(
-    initialForm = CallServiceFormForm(),
+    initialForm = CallServiceFormForm(
+        instanceId = HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: ""
+    ),
     client = client
 ) {
 
@@ -206,45 +208,49 @@ class CallServiceViewModel(
     }
 
     /**
-     * Change the target instance and reload services and entities
-     * Only for new actions - not for editing existing actions
+     * Change the target instance and reload services and entities.
+     * Only for new actions - not for editing existing actions.
      */
     fun changeInstance(instanceId: String) {
         form = form.copy(instanceId = instanceId)
-        
+        selectedService = null
+        services = emptyList()
+        entities = emptyList()
+        clientError = ""
+        isLoadingInstance = true
+
         viewModelScope.launch {
-            val instance = HaInstanceRepository.getById(instanceId)
-            if (instance != null) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val newClient = createClientForInstance(instance)
-                        val success = newClient.ping()
-                        if (success) {
-                            // Load services and entities
-                            val servicesList = newClient.getServicesFront()
-                            val entitiesList = newClient.getEntities()
-                            
-                            services = servicesList
-                            entities = entitiesList
-                            clientError = ""
-                            
-                            logDebug("Loaded ${services.size} services and ${entities.size} entities from instance: ${instance.name}")
-                        } else {
-                            clientError = newClient.error
-                            services = emptyList()
-                            entities = emptyList()
-                            logError("Failed to ping instance: ${newClient.error}")
+            try {
+                val instance = HaInstanceRepository.getById(instanceId)
+                if (instance != null) {
+                    withContext(Dispatchers.IO) {
+                        try {
+                            val newClient = createClientForInstance(instance)
+                            val success = newClient.ping()
+                            if (success) {
+                                services = newClient.getServicesFront()
+                                entities = newClient.getEntities()
+                                clientError = ""
+                                logDebug("Loaded ${services.size} services and ${entities.size} entities from instance: ${instance.name}")
+                            } else {
+                                clientError = newClient.error
+                                logError("Failed to ping instance: ${newClient.error}")
+                            }
+                        } catch (e: Exception) {
+                            clientError = e.message ?: "Unknown error"
+                            logError("Error loading data: ${e.message}")
                         }
-                    } catch (e: Exception) {
-                        clientError = e.message ?: "Unknown error"
-                        services = emptyList()
-                        entities = emptyList()
-                        logError("Error loading data: ${e.message}")
                     }
+                } else {
+                    clientError = "Instance not found"
                 }
+            } finally {
+                isLoadingInstance = false
             }
         }
     }
+
+    fun retryLoad() = changeInstance(form.instanceId)
 
     private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
         val url = instance.resolveUrl()

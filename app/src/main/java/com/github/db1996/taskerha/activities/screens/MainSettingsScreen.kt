@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,12 +28,14 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -46,6 +49,7 @@ import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.logging.LogLevel
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
+import com.github.db1996.taskerha.service.WsConnectionState
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import com.github.db1996.taskerha.util.NetworkHelper
 import com.github.db1996.taskerha.util.hasNotificationPermission
@@ -56,7 +60,6 @@ import kotlinx.coroutines.withContext
 
 private enum class SettingsTab(val label: String) {
     INSTANCES("Instances"),
-    WEBSOCKET("WebSocket"),
     TRIGGERS("Triggers"),
     LOGGING("Logging"),
 }
@@ -79,20 +82,37 @@ fun MainSettingsScreen(
 
     // Instance editor state
     var editingInstance by remember { mutableStateOf<HaInstance?>(null) }
-    var showActivateConfirmation by remember { mutableStateOf<HaInstance?>(null) }
+    // WS enable flow state
+    var notificationGranted by remember { mutableStateOf(hasNotificationPermission(context)) }
+    var pendingWsInstance by remember { mutableStateOf<HaInstance?>(null) }
+    var showWsPopup by remember { mutableStateOf<HaInstance?>(null) }
+    // oldInstance to newInstance when switching WS between instances
+    var showSwitchConfirm by remember { mutableStateOf<Pair<HaInstance, HaInstance>?>(null) }
 
-    // --- Websocket state
-    var wsEnabled by remember { mutableStateOf(HaSettings.loadWebSocketEnabled(context)) }
-    var showBatteryDialog by remember { mutableStateOf(!hasSeenBatteryDialog(context) && wsEnabled) }
+    fun applyWsEnable(instance: HaInstance) {
+        instances.filter { it.wsEnabled && it.id != instance.id }.forEach { old ->
+            HaInstanceRepository.update(old.copy(wsEnabled = false))
+        }
+        HaInstanceRepository.update(instance.copy(wsEnabled = true))
+        HaInstanceRepository.setActive(instance.id)
+        HaSettings.saveWebSocketEnabled(context, true)
+        HaWebSocketService.start(context)
+    }
 
-    fun enableWebSocket() {
+    fun disableWs(instance: HaInstance) {
+        HaInstanceRepository.update(instance.copy(wsEnabled = false))
+        HaSettings.saveWebSocketEnabled(context, false)
+        HaWebSocketService.stop(context)
+    }
 
-        if (!hasSeenBatteryDialog(context)) {
-            showBatteryDialog = true
+    fun proceedEnableWs(instance: HaInstance) {
+        val otherActive = instances.firstOrNull { it.wsEnabled && it.id != instance.id }
+        if (otherActive != null) {
+            showSwitchConfirm = otherActive to instance
+        } else if (!hasWsPopupDismissed(context)) {
+            showWsPopup = instance
         } else {
-            wsEnabled = true
-            HaSettings.saveWebSocketEnabled(context, true)
-            HaWebSocketService.start(context)
+            applyWsEnable(instance)
         }
     }
 
@@ -100,12 +120,12 @@ fun MainSettingsScreen(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
         ) { granted ->
-            if (granted) {
-                enableWebSocket()
-            } else {
-                wsEnabled = false
-                HaSettings.saveWebSocketEnabled(context, false)
+            notificationGranted = granted
+            pendingWsInstance?.let { inst ->
+                if (granted) proceedEnableWs(inst)
+                // if denied, showWsPopup stays null; popup is not shown
             }
+            pendingWsInstance = null
         }
 
     // --- Logging state
@@ -168,36 +188,25 @@ fun MainSettingsScreen(
                         editingInstance = instance
                     },
                     onDeleteInstance = { instance ->
+                        if (instance.wsEnabled) {
+                            HaSettings.saveWebSocketEnabled(context, false)
+                            HaWebSocketService.stop(context)
+                        }
                         HaInstanceRepository.delete(instance.id)
                     },
                     onSetDefault = { instance ->
                         HaInstanceRepository.setDefault(instance.id)
                     },
-                    onActivateInstance = { instance ->
-                        if (wsEnabled && activeInstanceId != instance.id) {
-                            showActivateConfirmation = instance
-                        } else {
-                            HaInstanceRepository.setActive(instance.id)
-                        }
-                    }
-                )
-
-                SettingsTab.WEBSOCKET -> WebSocketTab(
-                    wsEnabled = wsEnabled,
-                    onToggle = { enabled ->
+                    onToggleWs = { instance, enabled ->
                         if (enabled) {
-                            if (hasNotificationPermission(context)) {
-                                enableWebSocket()
-                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                wsEnabled = false
+                            if (!notificationGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                pendingWsInstance = instance
                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             } else {
-                                enableWebSocket()
+                                proceedEnableWs(instance)
                             }
                         } else {
-                            wsEnabled = false
-                            HaSettings.saveWebSocketEnabled(context, false)
-                            HaWebSocketService.stop(context)
+                            disableWs(instance)
                         }
                     }
                 )
@@ -233,38 +242,48 @@ fun MainSettingsScreen(
         }
     }
 
-    // Battery dialog stays global because it can be triggered from the websocket tab
-    if (showBatteryDialog) {
+    // WS first-enable info popup
+    showWsPopup?.let { instance ->
+        WsInfoDialog(
+            notificationGranted = notificationGranted || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU,
+            onRequestPermission = {
+                pendingWsInstance = instance
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+            onEnable = { neverShowAgain ->
+                if (neverShowAgain) setWsPopupDismissed(context)
+                showWsPopup = null
+                applyWsEnable(instance)
+            },
+            onDismiss = { showWsPopup = null }
+        )
+    }
+
+    // Switch WS between instances confirmation
+    showSwitchConfirm?.let { (oldInstance, newInstance) ->
+        val oldName = oldInstance.name.takeIf { it.isNotBlank() } ?: oldInstance.remoteUrl
+        val newName = newInstance.name.takeIf { it.isNotBlank() } ?: newInstance.remoteUrl
         AlertDialog(
-            onDismissRequest = { },
-            title = { Text("Allow background activity") },
+            onDismissRequest = { showSwitchConfirm = null },
+            title = { Text("Switch WebSocket instance?") },
             text = {
                 Text(
-                    "To reliably receive Home Assistant triggers, Android must allow this app " +
-                            "to run in the background.\n\n" +
-                            "On the next screen, open Battery and set it to allow background activity " +
-                            "or Unrestricted (wording may differ per device)."
+                    "WebSocket triggers are currently active for \"$oldName\". " +
+                        "Switch to \"$newName\"? The connection will reconnect to the new instance."
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        setBatteryDialogShown(context)
-                        openAppBatterySettings(context)
-                        wsEnabled = true
-                        HaSettings.saveWebSocketEnabled(context, true)
-                        HaWebSocketService.start(context)
+                        showSwitchConfirm = null
+                        applyWsEnable(newInstance)
                     }
-                ) { Text("Open settings") }
+                ) { Text("Switch") }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        wsEnabled = false
-                        HaSettings.saveWebSocketEnabled(context, false)
-                        HaWebSocketService.stop(context)
-                    }
-                ) { Text("Not now") }
+                TextButton(onClick = { showSwitchConfirm = null }) { Text("Cancel") }
             }
         )
     }
@@ -285,35 +304,6 @@ fun MainSettingsScreen(
         )
     }
 
-    // Activation confirmation dialog
-    showActivateConfirmation?.let { instance ->
-        AlertDialog(
-            onDismissRequest = { showActivateConfirmation = null },
-            title = { Text("Switch Active Instance?") },
-            text = {
-                Text(
-                    "Switching the active instance will change which Home Assistant triggers are active. " +
-                            "The websocket connection will reconnect to:\n\n" +
-                            (instance.name.takeIf { it.isNotBlank() } ?: instance.remoteUrl)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        HaInstanceRepository.setActive(instance.id)
-                        HaWebSocketService.stop(context)
-                        HaWebSocketService.start(context)
-                        showActivateConfirmation = null
-                    }
-                ) { Text("Switch") }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showActivateConfirmation = null }
-                ) { Text("Cancel") }
-            }
-        )
-    }
 }
 
 @Composable
@@ -324,7 +314,7 @@ private fun InstancesTab(
     onEditInstance: (HaInstance) -> Unit,
     onDeleteInstance: (HaInstance) -> Unit,
     onSetDefault: (HaInstance) -> Unit,
-    onActivateInstance: (HaInstance) -> Unit
+    onToggleWs: (HaInstance, Boolean) -> Unit
 ) {
     val sortedInstances = HaInstanceRepository.getAllSorted()
     
@@ -366,7 +356,7 @@ private fun InstancesTab(
                     onEdit = { onEditInstance(instance) },
                     onDelete = { onDeleteInstance(instance) },
                     onSetDefault = { onSetDefault(instance) },
-                    onActivate = { onActivateInstance(instance) }
+                    onToggleWs = { enabled -> onToggleWs(instance, enabled) }
                 )
             }
         }
@@ -390,104 +380,129 @@ private fun InstanceCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetDefault: () -> Unit,
-    onActivate: () -> Unit
+    onToggleWs: (Boolean) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    val wsState by HaWebSocketService.connectionState.collectAsState()
+    val wsStatus = when {
+        !instance.wsEnabled || !isActive -> "Off"
+        wsState == WsConnectionState.CONNECTED -> "Connected"
+        wsState == WsConnectionState.CONNECTING -> "Connecting..."
+        wsState == WsConnectionState.FAILED -> "Failed"
+        else -> "Connecting..."
+    }
+    val isConnected = instance.wsEnabled && isActive &&
+        wsState == WsConnectionState.CONNECTED
+    val dotColor = when {
+        !instance.wsEnabled || !isActive -> MaterialTheme.colorScheme.outline
+        wsState == WsConnectionState.CONNECTED -> Color(0xFF4CAF50)
+        wsState == WsConnectionState.CONNECTING -> Color(0xFFFFA000)
+        wsState == WsConnectionState.FAILED -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.outline
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header with title and badges
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+            // Header: dot + name + chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (instance.name.isNotBlank()) {
+                Canvas(modifier = Modifier.size(10.dp)) {
+                    drawCircle(color = dotColor)
+                }
+                if (instance.name.isNotBlank()) {
+                    Text(instance.name, style = MaterialTheme.typography.titleMedium)
+                }
+                if (instance.isDefault) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
                         Text(
-                            instance.name,
-                            style = MaterialTheme.typography.titleMedium
+                            "Default",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
-                    if (instance.isDefault) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                "Default",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    }
-                    if (isActive) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                            shape = MaterialTheme.shapes.small
-                        ) {
-                            Text(
-                                "Active",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
+                }
+                if (isActive) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            "Active",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
                     }
                 }
+            }
+
+            // URLs
+            Text(
+                instance.remoteUrl.takeIf { it.isNotBlank() } ?: "(No URL)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (instance.localUrl.isNotBlank()) {
                 Text(
-                    instance.remoteUrl.takeIf { it.isNotBlank() } ?: "(No URL)",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "Local: ${instance.localUrl}",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                if (instance.localUrl.isNotBlank()) {
+            }
+
+            // WebSocket row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "WebSocket triggers",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     Text(
-                        "Local: ${instance.localUrl}",
+                        wsStatus,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = when {
+                            isConnected -> MaterialTheme.colorScheme.primary
+                            instance.wsEnabled && isActive &&
+                                wsState == WsConnectionState.FAILED ->
+                                    MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Switch(
+                        checked = instance.wsEnabled,
+                        onCheckedChange = onToggleWs
                     )
                 }
             }
 
-            // First row of buttons: Edit and Delete
+            // Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = onEdit,
-                    modifier = Modifier.weight(1f)
-                ) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Edit")
                 }
-                OutlinedButton(
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Delete")
-                }
-            }
-
-            // Second row of buttons: Set Default and Activate
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
                 OutlinedButton(
                     onClick = onSetDefault,
                     enabled = !instance.isDefault,
@@ -495,12 +510,12 @@ private fun InstanceCard(
                 ) {
                     Text("Set Default")
                 }
-                OutlinedButton(
-                    onClick = onActivate,
-                    enabled = !isActive,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Activate")
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = "Delete instance",
+                        tint = MaterialTheme.colorScheme.error
+                    )
                 }
             }
         }
@@ -1021,28 +1036,120 @@ private fun findActivity(context: Context): Activity? {
 }
 
 @Composable
-private fun WebSocketTab(
-    wsEnabled: Boolean,
-    onToggle: (Boolean) -> Unit
+private fun WsInfoDialog(
+    notificationGranted: Boolean,
+    onRequestPermission: () -> Unit,
+    onEnable: (neverShowAgain: Boolean) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text("Enable background HA triggers")
-        Switch(
-            checked = wsEnabled,
-            onCheckedChange = onToggle
-        )
-    }
+    val context = LocalContext.current
+    var neverShow by remember { mutableStateOf(false) }
 
-    Spacer(Modifier.height(8.dp))
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Background HA triggers") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Keeps a persistent WebSocket connection to Home Assistant so Tasker " +
+                        "profiles can fire from HA state changes and custom events."
+                )
+                Text(
+                    "For more details, see the TaskerHA documentation on GitHub.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-    Text(
-        "Keeps a persistent WebSocket connection to Home Assistant so Tasker profile events can trigger from HA events."
+                HorizontalDivider()
+
+                Text("Notification access", style = MaterialTheme.typography.titleSmall)
+                if (notificationGranted) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            "Notification access granted",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            "Required to show the background service notification",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onRequestPermission,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Grant notification access")
+                    }
+                }
+
+                HorizontalDivider()
+
+                Text("Battery optimization", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "For reliable triggers, set Battery usage to Unrestricted in Android settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { openAppBatterySettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open battery settings")
+                }
+
+                HorizontalDivider()
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(checked = neverShow, onCheckedChange = { neverShow = it })
+                    Text("Don't show this again", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (!notificationGranted) {
+                        Toast.makeText(context, "Grant notification access first", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onEnable(neverShow)
+                    }
+                }
+            ) { Text("Enable") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
     )
-    Text("It listens to state changes and your custom event channel.")
-    Text("For reliability, you may need to set Battery usage to Unrestricted / allow background activity.")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1145,16 +1252,16 @@ enum class Status {
 }
 
 private const val PREFS_NAME = "settings"
-private const val KEY_BATTERY_DIALOG_SHOWN = "battery_dialog_shown"
+private const val KEY_WS_POPUP_DISMISSED = "ws_popup_dismissed"
 
-fun hasSeenBatteryDialog(context: Context): Boolean {
+fun hasWsPopupDismissed(context: Context): Boolean {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return prefs.getBoolean(KEY_BATTERY_DIALOG_SHOWN, false)
+    return prefs.getBoolean(KEY_WS_POPUP_DISMISSED, false)
 }
 
-fun setBatteryDialogShown(context: Context, value: Boolean = true) {
+fun setWsPopupDismissed(context: Context) {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    prefs.edit { putBoolean(KEY_BATTERY_DIALOG_SHOWN, value) }
+    prefs.edit { putBoolean(KEY_WS_POPUP_DISMISSED, true) }
 }
 
 fun openAppBatterySettings(context: Context) {

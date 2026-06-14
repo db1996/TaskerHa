@@ -30,6 +30,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -46,6 +49,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
 import java.util.logging.Logger
 
+
+enum class WsConnectionState { IDLE, CONNECTING, CONNECTED, FAILED }
 
 class HaWebSocketService : Service(), BaseLogger {
     private val json = Json { ignoreUnknownKeys = true }
@@ -69,6 +74,9 @@ class HaWebSocketService : Service(), BaseLogger {
         const val CHANNEL_ID = "ha_websocket_channel"
         const val NOTIFICATION_ID = 1001
         const val ACTION_RESUBSCRIBE_TRIGGERS = "com.github.db1996.taskerha.RESUBSCRIBE_TRIGGERS"
+
+        private val _connectionState = MutableStateFlow(WsConnectionState.IDLE)
+        val connectionState: StateFlow<WsConnectionState> = _connectionState.asStateFlow()
 
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
@@ -190,6 +198,7 @@ class HaWebSocketService : Service(), BaseLogger {
     override fun onDestroy() {
         super.onDestroy()
         isShuttingDown = true
+        _connectionState.value = WsConnectionState.IDLE
         wifiRegistration?.unregister()
         wifiRegistration = null
         reconnectJob?.cancel()
@@ -238,6 +247,7 @@ class HaWebSocketService : Service(), BaseLogger {
         }
 
         lastResolvedUrl = url
+        _connectionState.value = WsConnectionState.CONNECTING
         updateNotification("Connecting to Home Assistant...")
 
         val wsUrl = url
@@ -287,6 +297,7 @@ class HaWebSocketService : Service(), BaseLogger {
                         when (envelope.type) {
                             "auth_ok" -> {
                                 logInfo("Auth OK, subscribing to events")
+                                _connectionState.value = WsConnectionState.CONNECTED
                                 updateNotification("Connected to Home Assistant")
                                 reconnectAttempts = 0
                                 reconnectJob?.cancel()
@@ -329,6 +340,7 @@ class HaWebSocketService : Service(), BaseLogger {
 
                             "auth_invalid" -> {
                                 logError("Auth invalid, stopping service")
+                                _connectionState.value = WsConnectionState.FAILED
                                 stopSelf()
                             }
 
@@ -402,9 +414,11 @@ class HaWebSocketService : Service(), BaseLogger {
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 try {
+                    _connectionState.value = WsConnectionState.FAILED
                     this@HaWebSocketService.webSocket = null
                     scheduleReconnect("Reschedule onFailure: ${t.message}")
                 } catch (t2: Throwable) {
+                    _connectionState.value = WsConnectionState.FAILED
                     this@HaWebSocketService.webSocket = null
                     scheduleReconnect("Reschedule onFailure: ${t2.message}")
                 }

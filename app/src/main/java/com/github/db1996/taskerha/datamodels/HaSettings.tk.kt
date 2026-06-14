@@ -199,7 +199,8 @@ data class HaInstance(
     val homeSsids: Set<String> = emptySet(),
     val clientCertEnabled: Boolean = false,
     val clientCertAlias: String = "",
-    val isDefault: Boolean = false
+    val isDefault: Boolean = false,
+    val wsEnabled: Boolean = false
 ) {
     /**
      * Resolves the appropriate URL based on current network context.
