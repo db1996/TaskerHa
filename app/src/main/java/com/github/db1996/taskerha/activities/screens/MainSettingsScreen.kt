@@ -26,7 +26,9 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Wifi
@@ -460,6 +462,54 @@ private fun InstanceCard(
                 )
             }
 
+            // HACS companion badge
+            when {
+                !instance.hacsChecked -> Surface(
+                    color = Color(0xFFFFA000).copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Warning,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFFFFA000)
+                        )
+                        Text(
+                            "TaskerHA Companion not checked",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFFFA000)
+                        )
+                    }
+                }
+                instance.hacsAvailable -> Surface(
+                    color = Color(0xFF4CAF50).copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                        Text(
+                            "TaskerHA Companion",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF4CAF50)
+                        )
+                    }
+                }
+            }
+
             // WebSocket row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -535,14 +585,40 @@ private fun InstanceEditorDialog(
     var homeSsids by remember { mutableStateOf(instance.homeSsids) }
     var clientCertEnabled by remember { mutableStateOf(instance.clientCertEnabled) }
     var clientCertAlias by remember { mutableStateOf(instance.clientCertAlias) }
-    
+    var hacsAvailable by remember { mutableStateOf(instance.hacsAvailable) }
+    var hacsChecked by remember { mutableStateOf(instance.hacsChecked) }
+    var hacsChecking by remember { mutableStateOf(false) }
+
     var status by remember { mutableStateOf(Status.Idle) }
     var error by remember { mutableStateOf<String?>(null) }
     var testingLabel by remember { mutableStateOf<String?>(null) }
-    
+
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
+
+    fun checkHacs() {
+        hacsChecking = true
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = clientCertEnabled,
+            clientCertAlias = clientCertAlias
+        )
+        val client = HomeAssistantClient(remoteUrl.trim(), token.trim(), httpClient)
+        scope.launch {
+            val services = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                    client.getServices()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            hacsAvailable = services.any { it.domain == "taskerha_companion" }
+            hacsChecked = true
+            hacsChecking = false
+        }
+    }
+
     fun runTest(label: String, targetUrl: String) {
         testingLabel = label
         status = Status.Testing
@@ -647,6 +723,48 @@ private fun InstanceEditorDialog(
                         Text(if (testingLabel == "Local") "Testing..." else "Test Local")
                     }
                 }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("TaskerHA Companion", style = MaterialTheme.typography.bodyMedium)
+                        val hacsLabel = when {
+                            hacsChecking -> "Checking..."
+                            !hacsChecked -> "Not checked"
+                            hacsAvailable -> "Integration found"
+                            else -> "Integration not found"
+                        }
+                        val hacsColor = if (!hacsChecking && hacsChecked && hacsAvailable) Color(0xFF4CAF50)
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        Text(
+                            hacsLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = hacsColor
+                        )
+                    }
+                    IconButton(
+                        onClick = { checkHacs() },
+                        enabled = !hacsChecking && remoteUrl.isNotBlank() && token.isNotBlank()
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = "Refresh HACS check")
+                    }
+                    IconButton(
+                        onClick = {
+                            val intent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                "https://github.com/db1996/taskerha-hacs".toUri()
+                            )
+                            context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    ) {
+                        Icon(Icons.Rounded.Info, contentDescription = "About TaskerHA Companion")
+                    }
+                }
             }
         },
         confirmButton = {
@@ -661,7 +779,9 @@ private fun InstanceEditorDialog(
                             token = token.trim(),
                             homeSsids = homeSsids,
                             clientCertEnabled = clientCertEnabled,
-                            clientCertAlias = clientCertAlias
+                            clientCertAlias = clientCertAlias,
+                            hacsAvailable = hacsAvailable,
+                            hacsChecked = hacsChecked
                         )
                     )
                 }

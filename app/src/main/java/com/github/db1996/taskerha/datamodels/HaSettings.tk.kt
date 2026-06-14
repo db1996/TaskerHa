@@ -200,7 +200,9 @@ data class HaInstance(
     val clientCertEnabled: Boolean = false,
     val clientCertAlias: String = "",
     val isDefault: Boolean = false,
-    val wsEnabled: Boolean = false
+    val wsEnabled: Boolean = false,
+    val hacsAvailable: Boolean = false,
+    val hacsChecked: Boolean = false
 ) {
     /**
      * Resolves the appropriate URL based on current network context.
