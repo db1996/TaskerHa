@@ -55,7 +55,7 @@ fun CallServiceScreen(
         showTestButton = true
     ) { padding ->
         val scrollState = rememberScrollState()
-        val serviceSelected = viewModel.selectedService != null
+        val serviceSelected = viewModel.selectedService != null && fieldEntitySearching == null
         Column(
             modifier = Modifier
                 .padding(padding)
