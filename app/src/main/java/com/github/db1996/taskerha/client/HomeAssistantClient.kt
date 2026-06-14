@@ -123,17 +123,17 @@ class HomeAssistantClient(
     // --- API calls
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val response = http.newCall(request("/api/")).execute()
-            logVerbose("Ping url ${response.request.url}")
-
-            if (!response.isSuccessful) {
-                val body = runCatching { response.body?.string() }.getOrNull()
-                error = formatHttpError(response, body)
-                homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                false
-            } else {
-                homeAssistantStatus = HomeassistantStatus.CONNECTED
-                true
+            http.newCall(request("/api/")).execute().use { response ->
+                logVerbose("Ping url ${response.request.url}")
+                if (!response.isSuccessful) {
+                    val body = runCatching { response.body?.string() }.getOrNull()
+                    error = formatHttpError(response, body)
+                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                    false
+                } else {
+                    homeAssistantStatus = HomeassistantStatus.CONNECTED
+                    true
+                }
             }
         } catch (e: Exception) {
             error = formatException(e)
@@ -147,18 +147,16 @@ class HomeAssistantClient(
         if (entities.isNotEmpty()) return@withContext entities
 
         try {
-            val response = http.newCall(request("/api/states")).execute()
-            val body = response.body?.string()
-            if (!response.isSuccessful) {
-                error = formatHttpError(response, body)
-                return@withContext emptyList()
+            http.newCall(request("/api/states")).execute().use { response ->
+                val body = response.body?.string()
+                if (!response.isSuccessful) {
+                    error = formatHttpError(response, body)
+                    return@withContext emptyList()
+                }
+                if (body == null) return@withContext emptyList()
+                entities = json.decodeFromString(body)
+                entities
             }
-
-            if (body == null) return@withContext emptyList()
-            entities = json.decodeFromString(body)
-            entities
-
-
         } catch (e: Exception) {
             error = formatException(e)
             emptyList()
@@ -173,17 +171,17 @@ class HomeAssistantClient(
             if (services.isNotEmpty() && !force) return@withContext services
 
             try {
-                val response = http.newCall(request("/api/services")).execute()
-                val body = response.body?.string()
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, body)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    return@withContext emptyList()
+                http.newCall(request("/api/services")).execute().use { response ->
+                    val body = response.body?.string()
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, body)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        return@withContext emptyList()
+                    }
+                    if (body == null) return@withContext emptyList()
+                    services = json.decodeFromString(body)
+                    services
                 }
-
-                if (body == null) return@withContext emptyList()
-                services = json.decodeFromString(body)
-                services
             } catch (e: Exception) {
                 error = formatException(e)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
@@ -207,14 +205,14 @@ class HomeAssistantClient(
             if (registryData != null && !force) return@withContext registryData
 
             try {
-                val body = "{}"
-                val response = http.newCall(
-                    request("/api/services/taskerha_companion/get_registry_data?return_response", body)
-                ).execute()
-                val responseBody = response.body?.string()
-                if (!response.isSuccessful || responseBody == null) return@withContext null
-                registryData = json.decodeFromString<HaRegistryData>(responseBody)
-                registryData
+                http.newCall(
+                    request("/api/services/taskerha_companion/get_registry_data?return_response", "{}")
+                ).execute().use { response ->
+                    val responseBody = response.body?.string()
+                    if (!response.isSuccessful || responseBody == null) return@withContext null
+                    registryData = json.decodeFromString<HaRegistryData>(responseBody)
+                    registryData
+                }
             } catch (e: Exception) {
                 null
             }
@@ -227,16 +225,17 @@ class HomeAssistantClient(
             val req = request("/api/states/$entityId")
             logVerbose("url: ${req.url}")
             try {
-                val response = http.newCall(req).execute()
-                logVerbose("Response: $response")
-                result = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, result)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    false
-                } else {
-                    homeAssistantStatus = HomeassistantStatus.CONNECTED
-                    true
+                http.newCall(req).execute().use { response ->
+                    logVerbose("Response: $response")
+                    result = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, result)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        false
+                    } else {
+                        homeAssistantStatus = HomeassistantStatus.CONNECTED
+                        true
+                    }
                 }
             } catch (e: IOException) {
                 error = formatException(e)
@@ -249,11 +248,12 @@ class HomeAssistantClient(
         withContext(Dispatchers.IO) {
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext emptyList()
             try {
-                val response = http.newCall(request("/api/states/$entityId")).execute()
-                val body = response.body?.string()
-                if (!response.isSuccessful || body == null) return@withContext emptyList()
-                val detail = json.decodeFromString<com.github.db1996.taskerha.datamodels.HaEntityStateDetail>(body)
-                detail.attributes.keys.toList()
+                http.newCall(request("/api/states/$entityId")).execute().use { response ->
+                    val body = response.body?.string()
+                    if (!response.isSuccessful || body == null) return@withContext emptyList()
+                    val detail = json.decodeFromString<com.github.db1996.taskerha.datamodels.HaEntityStateDetail>(body)
+                    detail.attributes.keys.toList()
+                }
             } catch (_: Exception) {
                 emptyList()
             }
@@ -288,16 +288,16 @@ class HomeAssistantClient(
             logVerbose("url: ${req.url}")
 
             try {
-                val response = http.newCall(req).execute()
-
-                result = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, result)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    false
-                } else {
-                    homeAssistantStatus = HomeassistantStatus.CONNECTED
-                    true
+                http.newCall(req).execute().use { response ->
+                    result = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, result)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        false
+                    } else {
+                        homeAssistantStatus = HomeassistantStatus.CONNECTED
+                        true
+                    }
                 }
             } catch (e: IOException) {
                 error = formatException(e)
@@ -324,16 +324,16 @@ class HomeAssistantClient(
             val req = request("/api/events/$eventType", body)
             logVerbose("url: ${req.url}")
             try {
-                val response = http.newCall(req).execute()
-
-                result = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, result)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    false
-                } else {
-                    homeAssistantStatus = HomeassistantStatus.CONNECTED
-                    true
+                http.newCall(req).execute().use { response ->
+                    result = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, result)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        false
+                    } else {
+                        homeAssistantStatus = HomeassistantStatus.CONNECTED
+                        true
+                    }
                 }
             } catch (e: IOException) {
                 error = formatException(e)
