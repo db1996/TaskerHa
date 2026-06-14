@@ -130,6 +130,33 @@ fun MainSettingsScreen(
             pendingWsInstance = null
         }
 
+    // HACS companion check state for main screen cards
+    var checkingHacsInstanceId by remember { mutableStateOf<String?>(null) }
+
+    fun checkHacsForInstance(instance: HaInstance) {
+        if (checkingHacsInstanceId != null) return
+        checkingHacsInstanceId = instance.id
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = instance.clientCertEnabled,
+            clientCertAlias = instance.clientCertAlias
+        )
+        val client = HomeAssistantClient(instance.remoteUrl.trim(), instance.token.trim(), httpClient)
+        scope.launch {
+            val services = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                    client.getServices()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            val hacsAvailable = services.any { it.domain == "taskerha_companion" }
+            HaInstanceRepository.update(instance.copy(hacsAvailable = hacsAvailable, hacsChecked = true))
+            checkingHacsInstanceId = null
+        }
+    }
+
     // --- Logging state
     var generalLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.GENERAL)) }
     var wsLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.WEBSOCKET)) }
@@ -177,6 +204,7 @@ fun MainSettingsScreen(
                 SettingsTab.INSTANCES -> InstancesTab(
                     instances = instances,
                     activeInstanceId = activeInstanceId,
+                    checkingHacsInstanceId = checkingHacsInstanceId,
                     onAddInstance = {
                         editingInstance = HaInstance(
                             id = HaInstance.generateShortId(),
@@ -210,7 +238,8 @@ fun MainSettingsScreen(
                         } else {
                             disableWs(instance)
                         }
-                    }
+                    },
+                    onCheckHacs = { instance -> checkHacsForInstance(instance) }
                 )
 
                 SettingsTab.LOGGING -> LoggingTab(
@@ -312,11 +341,13 @@ fun MainSettingsScreen(
 private fun InstancesTab(
     instances: List<HaInstance>,
     activeInstanceId: String?,
+    checkingHacsInstanceId: String?,
     onAddInstance: () -> Unit,
     onEditInstance: (HaInstance) -> Unit,
     onDeleteInstance: (HaInstance) -> Unit,
     onSetDefault: (HaInstance) -> Unit,
-    onToggleWs: (HaInstance, Boolean) -> Unit
+    onToggleWs: (HaInstance, Boolean) -> Unit,
+    onCheckHacs: (HaInstance) -> Unit,
 ) {
     val sortedInstances = HaInstanceRepository.getAllSorted()
     
@@ -355,10 +386,12 @@ private fun InstancesTab(
                 InstanceCard(
                     instance = instance,
                     isActive = instance.id == activeInstanceId,
+                    isCheckingHacs = checkingHacsInstanceId == instance.id,
                     onEdit = { onEditInstance(instance) },
                     onDelete = { onDeleteInstance(instance) },
                     onSetDefault = { onSetDefault(instance) },
-                    onToggleWs = { enabled -> onToggleWs(instance, enabled) }
+                    onToggleWs = { enabled -> onToggleWs(instance, enabled) },
+                    onCheckHacs = { onCheckHacs(instance) }
                 )
             }
         }
@@ -379,10 +412,12 @@ private fun InstancesTab(
 private fun InstanceCard(
     instance: HaInstance,
     isActive: Boolean,
+    isCheckingHacs: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetDefault: () -> Unit,
-    onToggleWs: (Boolean) -> Unit
+    onToggleWs: (Boolean) -> Unit,
+    onCheckHacs: () -> Unit,
 ) {
     val wsState by HaWebSocketService.connectionState.collectAsState()
     val wsStatus = when {
@@ -464,28 +499,6 @@ private fun InstanceCard(
 
             // HACS companion badge
             when {
-                !instance.hacsChecked -> Surface(
-                    color = Color(0xFFFFA000).copy(alpha = 0.15f),
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = Color(0xFFFFA000)
-                        )
-                        Text(
-                            "TaskerHA Companion not checked",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFFFFA000)
-                        )
-                    }
-                }
                 instance.hacsAvailable -> Surface(
                     color = Color(0xFF4CAF50).copy(alpha = 0.15f),
                     shape = MaterialTheme.shapes.small
@@ -506,6 +519,53 @@ private fun InstanceCard(
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF4CAF50)
                         )
+                    }
+                }
+                else -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Surface(
+                        color = Color(0xFFFFA000).copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFFFA000)
+                            )
+                            Text(
+                                if (!instance.hacsChecked) "Companion not checked"
+                                else "Companion not found",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFFA000)
+                            )
+                        }
+                    }
+                    if (isCheckingHacs) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFFFA000)
+                        )
+                    } else {
+                        IconButton(
+                            onClick = onCheckHacs,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Refresh,
+                                contentDescription = "Check companion",
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFFFFA000)
+                            )
+                        }
                     }
                 }
             }

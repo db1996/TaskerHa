@@ -50,7 +50,7 @@ class CallServiceViewModel(
     var pendingRestore: CallServiceFormBuiltForm? = null
 
     val hacsAvailable: Boolean
-        get() = HaInstanceRepository.getById(form.instanceId)?.hacsAvailable ?: false
+        get() = services.any { it.domain == "taskerha_companion" }
 
     override val logTag: String
         get() =  "CallServiceViewModel"
