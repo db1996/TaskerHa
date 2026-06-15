@@ -89,12 +89,17 @@ private enum class SettingsTab(val label: String) {
 @Composable
 fun MainSettingsScreen(
     modifier: Modifier,
-    setTopBar: (@Composable () -> Unit) -> Unit
+    setTopBar: (@Composable () -> Unit) -> Unit,
+    incomingBackupUri: android.net.Uri? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.INSTANCES) }
+
+    LaunchedEffect(incomingBackupUri) {
+        if (incomingBackupUri != null) selectedTab = SettingsTab.OPTIONS
+    }
 
     // Observe instances from repository
     val instances by HaInstanceRepository.instances.collectAsState()
@@ -286,7 +291,7 @@ fun MainSettingsScreen(
                     }
                 )
 
-                SettingsTab.OPTIONS -> OptionsTab()
+                SettingsTab.OPTIONS -> OptionsTab(incomingBackupUri = incomingBackupUri)
 
                 SettingsTab.TRIGGERS -> ActiveTriggersTab()
             }
@@ -1372,7 +1377,7 @@ private data class FDroidPackage(
 private val lenientJson = Json { ignoreUnknownKeys = true }
 
 @Composable
-private fun OptionsTab() {
+private fun OptionsTab(incomingBackupUri: android.net.Uri? = null) {
     val context = LocalContext.current
 
     // Notification permission
@@ -1564,6 +1569,9 @@ private fun OptionsTab() {
                 )
             }
         }
+
+        // Backup & Restore section
+        BackupRestoreSection(incomingUri = incomingBackupUri)
 
         // About section
         Text(

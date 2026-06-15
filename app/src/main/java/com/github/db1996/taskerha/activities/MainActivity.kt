@@ -1,5 +1,7 @@
 package com.github.db1996.taskerha.activities
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,9 +25,13 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
+        val incomingUri = intent
+            .takeIf { it.action == Intent.ACTION_VIEW }
+            ?.data
+
         setContent {
             TaskerHaTheme {
-                MainScreen()
+                MainScreen(incomingBackupUri = incomingUri)
             }
         }
     }
@@ -33,7 +39,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(incomingBackupUri: Uri? = null) {
     var topBarContent by remember { mutableStateOf<@Composable () -> Unit>({}) }
 
     Scaffold(
@@ -42,7 +48,8 @@ fun MainScreen() {
     ) { padding ->
         MainSettingsScreen(
             modifier = Modifier.padding(padding),
-            setTopBar = {  topBarContent = it }
+            setTopBar = { topBarContent = it },
+            incomingBackupUri = incomingBackupUri
         )
     }
 }
