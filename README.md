@@ -1,5 +1,7 @@
 # <img src="docs/logo.png" alt="Logo" width="50"/>TaskerHA
 
+> ### [📖 Documentation → taskerha.db1996-gh.com](https://taskerha.db1996-gh.com/)
+
 A Tasker plugin to fully integrate HomeAssistant into your workflow!
 
 You can respond to entity state changes, call any HA service, or retrieve an entity's state.
@@ -10,8 +12,6 @@ TaskerHA lets you:
 - Read the state and attributes of any entity
 - Trigger Tasker profiles when an entity (or a specific attribute of an entity) changes state over a websocket connection
 - Send direct messages from HA to tasker and back with a custom event (uses websocket)
-
-**[Full documentation](https://taskerha.db1996-gh.com/)**
 
 ## Requirements
 
