@@ -16,8 +16,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import com.github.db1996.taskerha.activities.screens.MainSettingsScreen
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
+import com.github.db1996.taskerha.util.PingManager
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,6 +36,13 @@ class MainActivity : ComponentActivity() {
             TaskerHaTheme {
                 MainScreen(incomingBackupUri = incomingUri)
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch {
+            PingManager.ping(this@MainActivity)
         }
     }
 }

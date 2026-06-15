@@ -67,6 +67,7 @@ import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.service.WsConnectionState
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import com.github.db1996.taskerha.util.NetworkHelper
+import com.github.db1996.taskerha.util.PingManager
 import com.github.db1996.taskerha.util.hasNotificationPermission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -1632,6 +1633,26 @@ private fun OptionsTab(incomingBackupUri: android.net.Uri? = null) {
                 fontWeight = FontWeight.Bold
             )
         }
+
+//        Text(
+//            "Debug",
+//            style = MaterialTheme.typography.titleSmall,
+//            color = MaterialTheme.colorScheme.primary
+//        )
+//
+//        Card(modifier = Modifier.fillMaxWidth()) {
+//            OutlinedButton(
+//                onClick = {
+//                    PingManager.clearDeviceId(context)
+//                    Toast.makeText(context, "Device UUID cleared", Toast.LENGTH_SHORT).show()
+//                },
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(12.dp)
+//            ) {
+//                Text("Reset device UUID")
+//            }
+//        }
     }
 
     if (showDisableNotifDialog) {

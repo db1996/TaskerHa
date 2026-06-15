@@ -10,9 +10,14 @@ import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.util.EntityRecents
 import com.github.db1996.taskerha.util.NetworkHelper
+import com.github.db1996.taskerha.util.PingManager
 import com.github.db1996.taskerha.util.PrefsJsonStore
 import com.github.db1996.taskerha.util.ServiceRecents
 import com.github.db1996.taskerha.util.hasNotificationPermission
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class TaskerHaApplication : Application() {
 
@@ -62,6 +67,10 @@ class TaskerHaApplication : Application() {
             if (token.isNotBlank() && (url.isNotBlank() || localUrl.isNotBlank())) {
                 HaWebSocketService.start(this)
             }
+        }
+
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            PingManager.ping(this@TaskerHaApplication)
         }
     }
 
