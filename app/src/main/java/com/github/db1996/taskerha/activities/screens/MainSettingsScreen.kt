@@ -1507,13 +1507,13 @@ private fun OptionsTab() {
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 AboutLinkRow(
-                    label = "Repository",
-                    url = "https://github.com/db1996/TaskerHa"
+                    label = "Documentation",
+                    url = "https://taskerha.db1996-gh.com/"
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 AboutLinkRow(
-                    label = "Documentation",
-                    url = "https://taskerha.db1996-gh.com/"
+                    label = "Repository",
+                    url = "https://github.com/db1996/TaskerHa"
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 AboutLinkRow(
