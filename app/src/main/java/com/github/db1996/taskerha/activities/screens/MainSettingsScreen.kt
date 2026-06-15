@@ -72,6 +72,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 private enum class SettingsTab(val label: String) {
     INSTANCES("Instances"),
@@ -1350,6 +1354,23 @@ private fun WsInfoDialog(
     )
 }
 
+@Serializable
+private data class GitHubRelease(val tag_name: String = "")
+
+@Serializable
+private data class FDroidPackageEntry(val versionName: String = "", val versionCode: Int = 0)
+
+@Serializable
+private data class FDroidPackage(
+    val suggestedVersionCode: Int = 0,
+    val packages: List<FDroidPackageEntry> = emptyList()
+) {
+    val suggestedVersionName: String
+        get() = packages.firstOrNull { it.versionCode == suggestedVersionCode }?.versionName ?: ""
+}
+
+private val lenientJson = Json { ignoreUnknownKeys = true }
+
 @Composable
 private fun OptionsTab() {
     val context = LocalContext.current
@@ -1381,6 +1402,53 @@ private fun OptionsTab() {
     }
     var showBatteryDialog by remember { mutableStateOf(false) }
 
+    // Version info
+    val currentVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+        } catch (_: Exception) { "Unknown" }
+    }
+    var githubVersion by remember { mutableStateOf<String?>(null) }
+    var fdroidVersion by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val httpClient = OkHttpClient()
+        launch {
+            val version = withContext(Dispatchers.IO) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://api.github.com/repos/db1996/TaskerHa/releases/latest")
+                        .header("Accept", "application/vnd.github+json")
+                        .build()
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body?.string() ?: return@use "Unknown"
+                            val release = lenientJson.decodeFromString<GitHubRelease>(body)
+                            release.tag_name.trimStart('v')
+                        } else "Unknown"
+                    }
+                } catch (_: Exception) { "Unknown" }
+            }
+            githubVersion = version
+        }
+        launch {
+            val version = withContext(Dispatchers.IO) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://f-droid.org/api/v1/packages/com.github.db1996.taskerha")
+                        .build()
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body?.string() ?: return@use "Not available"
+                            val pkg = lenientJson.decodeFromString<FDroidPackage>(body)
+                            pkg.suggestedVersionName.ifBlank { "Unknown" }
+                        } else "Not available"
+                    }
+                } catch (_: Exception) { "Unknown" }
+            }
+            fdroidVersion = version
+        }
+    }
 
     // Request timeout — track raw text so the field is editable mid-type
     var timeoutText by remember { mutableStateOf(HaSettings.loadRequestTimeout(context).toString()) }
@@ -1506,6 +1574,17 @@ private fun OptionsTab() {
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    VersionRow("Current version", currentVersion)
+                    VersionRow("Latest (GitHub)", githubVersion)
+                    VersionRow("Latest (F-Droid)", fdroidVersion)
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 AboutLinkRow(
                     label = "Documentation",
                     url = "https://taskerha.db1996-gh.com/"
@@ -1716,6 +1795,27 @@ fun hasWsPopupDismissed(context: Context): Boolean {
 fun setWsPopupDismissed(context: Context) {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     prefs.edit { putBoolean(KEY_WS_POPUP_DISMISSED, true) }
+}
+
+@Composable
+private fun VersionRow(label: String, value: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            value ?: "...",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (value == null) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface
+        )
+    }
 }
 
 @Composable
