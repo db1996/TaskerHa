@@ -40,7 +40,7 @@ fun OnHaMessageScreen(
     val instances by HaInstanceRepository.instances.collectAsState()
 
     BaseTaskerConfigScaffold(
-        title = "Direct message from HA",
+        title = "Direct message to HA",
         onSave = {
             val built = viewModel.buildForm()
             onSave(built)
