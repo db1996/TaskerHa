@@ -1,0 +1,7 @@
+New documentation site
+New companion HACS integration for richer HA control
+Use Areas/Labels/Devices as service call targets
+Multi-instance UI and stability improvements
+New Tasker action: toggle websocket connection
+New Options tab: notifications, battery, backup/restore
+Bug fixes: Samsung crash, instance timeout handling, entity picker fixes
