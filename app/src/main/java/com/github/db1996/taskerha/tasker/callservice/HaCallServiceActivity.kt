@@ -2,6 +2,7 @@ package com.github.db1996.taskerha.tasker.callservice
 
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
@@ -21,13 +22,16 @@ class HaCallServiceActivity : BaseTaskerConfigActivity<
 >() {
 
     override val viewModel: CallServiceViewModel by viewModels { createViewModelFactory() }
+    
+    // Track if this is a new action (no instanceId in input)
+    private var isNewAction = false
 
     override fun createViewModelFactory() = CallServiceViewModelFactory(this)
 
     override fun createHelper() = CallServiceConfigHelper(this)
 
     override fun createScreen(onSave: (CallServiceFormBuiltForm) -> Unit): @Composable () -> Unit = {
-        CallServiceScreen(viewModel, onSave)
+        CallServiceScreen(viewModel, onSave, isNewAction)
     }
 
     override fun convertBuiltFormToInput(builtForm: CallServiceFormBuiltForm): CallServiceInput {
@@ -41,10 +45,14 @@ class HaCallServiceActivity : BaseTaskerConfigActivity<
             domain = builtForm.domain
             service = builtForm.service
             dataJson = jsonData
+            instanceId = builtForm.instanceId
         }
     }
 
     override fun convertInputToBuiltForm(input: CallServiceInput): CallServiceFormBuiltForm {
+        // Track if this is a new action (no instanceId yet)
+        isNewAction = input.instanceId.isBlank()
+        
         val dataMap: Map<String, String> = try {
             Json.decodeFromString(
                 MapSerializer(String.serializer(), String.serializer()),
@@ -59,6 +67,9 @@ class HaCallServiceActivity : BaseTaskerConfigActivity<
             domain = input.domain,
             service = input.service,
             data = dataMap,
+            instanceId = input.instanceId.ifBlank { 
+                HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: "" 
+            },
             blurb = ""
         )
     }

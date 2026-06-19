@@ -17,10 +17,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.github.db1996.taskerha.activities.partials.InstanceSelector
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.messageback.data.MessageBackBuiltForm
 import com.github.db1996.taskerha.tasker.messageback.view.MessageBackViewModel
@@ -33,6 +37,7 @@ fun MessageBackScreen(
 ) {
     val context = LocalContext.current
     val form = viewModel.form
+    val instances by HaInstanceRepository.instances.collectAsState()
 
     BaseTaskerConfigScaffold(
         title = "Direct message from HA",
@@ -48,6 +53,14 @@ fun MessageBackScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (instances.isNotEmpty()) {
+                InstanceSelector(
+                    instances = instances,
+                    selectedInstanceId = form.instanceId,
+                    onInstanceSelected = { viewModel.changeInstance(it) }
+                )
+            }
+
             Text("Type")
             TextField(
                 value = form.type,

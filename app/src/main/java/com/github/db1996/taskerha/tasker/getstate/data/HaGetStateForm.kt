@@ -6,7 +6,8 @@ import com.github.db1996.taskerha.util.HasEntityIds
  * Mutable form state used in the ViewModel and UI
  */
 data class HaGetStateForm(
-    var entityId: String = ""
+    var entityId: String = "",
+    var instanceId: String = ""
 )
 
 /**
@@ -14,6 +15,7 @@ data class HaGetStateForm(
  */
 data class HaGetStateBuiltForm(
     val entityId: String,
+    val instanceId: String,
     val blurb: String
 ) : HasEntityIds {
     override fun entityIds(): List<String> = listOf(entityId)

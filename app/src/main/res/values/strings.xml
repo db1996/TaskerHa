@@ -13,6 +13,17 @@
     <string name="ha_on_trigger_to_label">New state</string>
     <string name="ha_on_trigger_for_label">Time in HH:MM:SS, time the state needs to be changed for</string>
     <string name="ha_on_trigger_attrs_label">New state attributes (JSON). For example: brightness: 100</string>
+    <string name="ha_on_trigger_entities_label">Entity IDs (comma-separated)</string>
+    <string name="ha_on_trigger_attr_1_label">Attribute slot 1</string>
+    <string name="ha_on_trigger_attr_2_label">Attribute slot 2</string>
+    <string name="ha_on_trigger_attr_3_label">Attribute slot 3</string>
+    <string name="ha_on_trigger_attr_4_label">Attribute slot 4</string>
+    <string name="ha_on_trigger_attr_5_label">Attribute slot 5</string>
+    <string name="ha_on_trigger_attr_6_label">Attribute slot 6</string>
+    <string name="ha_on_trigger_attr_7_label">Attribute slot 7</string>
+    <string name="ha_on_trigger_attr_8_label">Attribute slot 8</string>
+    <string name="ha_on_trigger_attr_9_label">Attribute slot 9</string>
+    <string name="ha_on_trigger_attr_10_label">Attribute slot 10</string>
 
     <string name="on_ha_message_type_label">Type (optional), can be anything custom</string>
     <string name="on_ha_message_message_label">Message (optional), can be anything custom</string>

@@ -34,6 +34,12 @@ abstract class BaseViewModel<F : Any, B : Any>(
         protected set
 
     /**
+     * True while an instance switch (or initial connect) is in progress
+     */
+    var isLoadingInstance: Boolean by mutableStateOf(false)
+        protected set
+
+    /**
      * Whether the client has been successfully pinged
      */
     private var clientPinged: Boolean = false

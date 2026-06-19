@@ -1,0 +1,3 @@
+- Added attribute filter for entity trigger. 
+- Added per entity config in entity trigger (optional)
+- Updated docs for the new entity trigger

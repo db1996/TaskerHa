@@ -9,6 +9,7 @@ import android.os.IBinder
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import com.github.db1996.taskerha.R
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.logging.LogChannel
@@ -29,6 +30,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -45,6 +49,8 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
 import java.util.logging.Logger
 
+
+enum class WsConnectionState { IDLE, CONNECTING, CONNECTED, FAILED }
 
 class HaWebSocketService : Service(), BaseLogger {
     private val json = Json { ignoreUnknownKeys = true }
@@ -69,12 +75,23 @@ class HaWebSocketService : Service(), BaseLogger {
         const val NOTIFICATION_ID = 1001
         const val ACTION_RESUBSCRIBE_TRIGGERS = "com.github.db1996.taskerha.RESUBSCRIBE_TRIGGERS"
 
+        private val _connectionState = MutableStateFlow(WsConnectionState.IDLE)
+        val connectionState: StateFlow<WsConnectionState> = _connectionState.asStateFlow()
+
         @RequiresApi(Build.VERSION_CODES.O)
         fun start(context: Context) {
+            _connectionState.value = WsConnectionState.CONNECTING
             CustomLogger.i(TAG, "Attempting to start websocket", LogChannel.WEBSOCKET)
 
             val intent = Intent(context, HaWebSocketService::class.java)
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: IllegalStateException) {
+                // ForegroundServiceStartNotAllowedException (API 31+) is thrown when the app is
+                // in a background state (e.g. process restored after an OS update). The service
+                // will be started the next time the user opens the app from the foreground.
+                CustomLogger.e(TAG, "Cannot start foreground service from background state", LogChannel.WEBSOCKET)
+            }
         }
 
         fun stop(context: Context) {
@@ -128,7 +145,14 @@ class HaWebSocketService : Service(), BaseLogger {
             return START_NOT_STICKY
         }
 
-        if (!isShuttingDown && webSocket == null && reconnectJob?.isActive != true) {
+        if (!isShuttingDown) {
+            // Always reconnect — this handles both initial start and instance switches.
+            // Cancel any pending reconnect and close the current socket so we start fresh
+            // connecting to whatever HaInstanceRepository.getActive() now points to.
+            reconnectJob?.cancel()
+            reconnectAttempts = 0
+            try { webSocket?.cancel() } catch (_: Throwable) {}
+            webSocket = null
             logInfo("Starting websocket service from onStartCommand")
             runCatching { connectWebSocket() }
                 .onFailure { t -> logError("connectWebSocket failed from onStartCommand", t) }
@@ -182,6 +206,7 @@ class HaWebSocketService : Service(), BaseLogger {
     override fun onDestroy() {
         super.onDestroy()
         isShuttingDown = true
+        _connectionState.value = WsConnectionState.IDLE
         wifiRegistration?.unregister()
         wifiRegistration = null
         reconnectJob?.cancel()
@@ -230,6 +255,7 @@ class HaWebSocketService : Service(), BaseLogger {
         }
 
         lastResolvedUrl = url
+        _connectionState.value = WsConnectionState.CONNECTING
         updateNotification("Connecting to Home Assistant...")
 
         val wsUrl = url
@@ -279,6 +305,7 @@ class HaWebSocketService : Service(), BaseLogger {
                         when (envelope.type) {
                             "auth_ok" -> {
                                 logInfo("Auth OK, subscribing to events")
+                                _connectionState.value = WsConnectionState.CONNECTED
                                 updateNotification("Connected to Home Assistant")
                                 reconnectAttempts = 0
                                 reconnectJob?.cancel()
@@ -321,6 +348,7 @@ class HaWebSocketService : Service(), BaseLogger {
 
                             "auth_invalid" -> {
                                 logError("Auth invalid, stopping service")
+                                _connectionState.value = WsConnectionState.FAILED
                                 stopSelf()
                             }
 
@@ -394,9 +422,11 @@ class HaWebSocketService : Service(), BaseLogger {
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 try {
+                    _connectionState.value = WsConnectionState.FAILED
                     this@HaWebSocketService.webSocket = null
                     scheduleReconnect("Reschedule onFailure: ${t.message}")
                 } catch (t2: Throwable) {
+                    _connectionState.value = WsConnectionState.FAILED
                     this@HaWebSocketService.webSocket = null
                     scheduleReconnect("Reschedule onFailure: ${t2.message}")
                 }
@@ -521,6 +551,10 @@ class HaWebSocketService : Service(), BaseLogger {
         val prefs = applicationContext.getSharedPreferences("TriggerStatePrefs", Context.MODE_PRIVATE)
         val items = prefs.getStringSet("items", emptySet()) ?: emptySet()
 
+        // Get active instance ID for filtering
+        val activeInstanceId = HaInstanceRepository.activeInstanceId.value
+        val defaultInstanceId = HaInstanceRepository.getDefault()?.id
+
         val perIdGroups = mutableMapOf<String, MutableList<StateTrigger>>()
         val legacyTriggers = mutableListOf<StateTrigger>()
 
@@ -528,19 +562,32 @@ class HaWebSocketService : Service(), BaseLogger {
             runCatching {
                 val built = payloadJson.decodeFromString<OnTriggerStateBuiltForm>(raw)
 
+                // Filter by instance - only subscribe triggers for active instance
+                val triggerInstanceId = built.instanceId.ifBlank { defaultInstanceId ?: "" }
+                if (triggerInstanceId != activeInstanceId) {
+                    // Skip triggers that don't match active instance
+                    return@runCatching
+                }
+
                 val effectiveIds = if (built.entityIds.isNotEmpty()) {
                     built.entityIds.map { it.trim() }.filter { it.isNotBlank() }
                 } else {
                     listOf(built.entityId.trim()).filter { it.isNotBlank() }
                 }
 
-                val stateTriggers = effectiveIds.map { entity ->
+                val stateTriggers = effectiveIds.mapIndexed { index, entity ->
+                    val config = if (built.configPerEntity) {
+                        built.entityConfigs.getOrNull(index) ?: built.sharedConfig
+                    } else {
+                        built.sharedConfig
+                    }
                     StateTrigger(
                         platform = "state",
                         entity_id = entity,
-                        from = built.fromState.trim().takeIf { it.isNotBlank() },
-                        to = built.toState.trim().takeIf { it.isNotBlank() },
-                        for_ = parseForDuration(built.forDuration)
+                        from = config.fromState.trim().takeIf { it.isNotBlank() },
+                        to = config.toState.trim().takeIf { it.isNotBlank() },
+                        for_ = parseForDuration(config.forDuration),
+                        attribute = config.targetAttribute.trim().takeIf { it.isNotBlank() }
                     )
                 }
 

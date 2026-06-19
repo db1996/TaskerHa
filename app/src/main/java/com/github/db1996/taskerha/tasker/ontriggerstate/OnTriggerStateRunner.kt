@@ -2,7 +2,6 @@ package com.github.db1996.taskerha.tasker.ontriggerstate
 
 import android.content.Context
 import com.github.db1996.taskerha.logging.CustomLogger
-import com.github.db1996.taskerha.service.data.OnTriggerStateEnvelope
 import com.github.db1996.taskerha.service.data.OnTriggerStateTriggerWsData
 import com.github.db1996.taskerha.service.data.OnTriggerStateWsTriggerFor
 import com.joaomgcd.taskerpluginlibrary.condition.TaskerPluginRunnerConditionEvent
@@ -10,7 +9,11 @@ import com.joaomgcd.taskerpluginlibrary.input.TaskerInput
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultCondition
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionSatisfied
 import com.joaomgcd.taskerpluginlibrary.runner.TaskerPluginResultConditionUnsatisfied
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 class OnTriggerStateRunner :
     TaskerPluginRunnerConditionEvent<
@@ -47,6 +50,85 @@ class OnTriggerStateRunner :
         val eventFor = wsForToDurationString(envelope.for_)
         update.forDuration = eventFor
 
+        // Populate ha_attr_1..10 from the configured attribute mapping
+        val mappingJson = config.attributeMappingJson
+        if (mappingJson.isNotBlank() && mappingJson != "{}") {
+            val mapping = try {
+                json.decodeFromString(
+                    MapSerializer(String.serializer(), Int.serializer()),
+                    mappingJson
+                )
+            } catch (_: Exception) {
+                emptyMap()
+            }
+            val attrs = envelope.to_state.attributes
+            for ((attrKey, slot) in mapping) {
+                val value = attrs[attrKey]?.let { el ->
+                    (el as? JsonPrimitive)?.contentOrNull ?: el.toString()
+                }
+                when (slot) {
+                    1 -> update.haAttr1 = value
+                    2 -> update.haAttr2 = value
+                    3 -> update.haAttr3 = value
+                    4 -> update.haAttr4 = value
+                    5 -> update.haAttr5 = value
+                    6 -> update.haAttr6 = value
+                    7 -> update.haAttr7 = value
+                    8 -> update.haAttr8 = value
+                    9 -> update.haAttr9 = value
+                    10 -> update.haAttr10 = value
+                }
+            }
+        }
+
+        // Build effective entity list
+        val multiIds = config.entityIds
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+        val effectiveIds = multiIds.ifEmpty {
+            listOf(config.entityId.trim()).filter { it.isNotBlank() }
+        }
+
+        // Populate output entityIds (comma-separated)
+        update.entityIds = effectiveIds.joinToString(",")
+
+        // Find per-entity index for the event entity
+        val entityIndex = if (effectiveIds.isNotEmpty()) effectiveIds.indexOf(update.entityId) else -1
+
+        // Resolve per-entity filter values based on configPerEntity flag
+        val configPerEntity = config.configPerEntity.trim().lowercase() == "true"
+        val entityFrom: String
+        val entityTo: String
+        val entityFor: String
+        val targetAttr: String
+
+        if (configPerEntity) {
+            fun splitPerEntity(raw: String): List<String> = raw.split("|;")
+            val fromList   = splitPerEntity(config.fromState)
+            val toList     = splitPerEntity(config.toState)
+            val forList    = splitPerEntity(config.forDuration)
+            val attrList   = splitPerEntity(config.targetAttribute)
+            entityFrom = if (entityIndex >= 0) fromList.getOrElse(entityIndex) { "" } else ""
+            entityTo   = if (entityIndex >= 0) toList.getOrElse(entityIndex) { "" } else ""
+            entityFor  = if (entityIndex >= 0) forList.getOrElse(entityIndex) { "" } else ""
+            targetAttr = if (entityIndex >= 0) attrList.getOrElse(entityIndex) { "" }.trim() else ""
+        } else {
+            // All-entities mode: single shared values apply to every entity
+            entityFrom = config.fromState
+            entityTo   = config.toState
+            entityFor  = config.forDuration
+            targetAttr = config.targetAttribute.trim()
+        }
+
+        // If targeting a specific attribute, expose its old/new value via ha_from/ha_to
+        if (targetAttr.isNotBlank()) {
+            fun attrStr(attrs: Map<String, kotlinx.serialization.json.JsonElement>, key: String): String? =
+                attrs[key]?.let { el -> (el as? JsonPrimitive)?.contentOrNull ?: el.toString() }
+            update.fromState = attrStr(envelope.from_state.attributes, targetAttr)
+            update.toState   = attrStr(envelope.to_state.attributes, targetAttr)
+        }
+
         // UUID fast-path: when both sides have a triggerId, only ID equality matters.
         // HA already applied entity/state/for filters when it fired the trigger.
         val eventTriggerId = update.triggerId
@@ -70,20 +152,6 @@ class OnTriggerStateRunner :
             return configVal.trim() == eventVal
         }
 
-        // Build effective entity list: prefer multi-entity field, fall back to legacy single field
-        val multiIds = config.entityIds
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        val effectiveIds = if (multiIds.isNotEmpty()) {
-            multiIds
-        } else {
-            listOf(config.entityId.trim()).filter { it.isNotBlank() }
-        }
-
-        // Populate output entityIds (comma-separated)
-        update.entityIds = effectiveIds.joinToString(",")
-
         if (effectiveIds.isNotEmpty()) {
             // Entity filter: event entity must be in the configured list
             if (update.entityId == null || update.entityId !in effectiveIds) {
@@ -91,26 +159,26 @@ class OnTriggerStateRunner :
             }
 
             if (update.fromState != null) {
-                if (!matches(config.fromState.trim(), update.fromState)) {
+                if (!matches(entityFrom, update.fromState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             } else {
-                if (config.fromState.isNotBlank()) {
+                if (entityFrom.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
 
             if (update.toState != null) {
-                if (!matches(config.toState.trim(), update.toState)) {
+                if (!matches(entityTo, update.toState)) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             } else {
-                if (config.toState.isNotBlank()) {
+                if (entityTo.isNotBlank()) {
                     return TaskerPluginResultConditionUnsatisfied()
                 }
             }
 
-            if (!matchesFor(config.forDuration, eventFor)) {
+            if (!matchesFor(entityFor, eventFor)) {
                 return TaskerPluginResultConditionUnsatisfied()
             }
         }

@@ -8,26 +8,49 @@ import android.content.Intent
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.security.KeyChain
 import android.widget.Toast
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import com.github.db1996.taskerha.R
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -35,22 +58,30 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaSettings
+import com.github.db1996.taskerha.datamodels.HaInstance
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.logging.LogChannel
 import com.github.db1996.taskerha.logging.LogLevel
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
+import com.github.db1996.taskerha.service.WsConnectionState
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import com.github.db1996.taskerha.util.NetworkHelper
+import com.github.db1996.taskerha.util.PingManager
 import com.github.db1996.taskerha.util.hasNotificationPermission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 private enum class SettingsTab(val label: String) {
-    CONNECTION("Connection"),
-    WEBSOCKET("WebSocket"),
+    INSTANCES("Instances"),
     TRIGGERS("Triggers"),
+    OPTIONS("Options"),
     LOGGING("Logging"),
 }
 
@@ -59,67 +90,55 @@ private enum class SettingsTab(val label: String) {
 @Composable
 fun MainSettingsScreen(
     modifier: Modifier,
-    setTopBar: (@Composable () -> Unit) -> Unit
+    setTopBar: (@Composable () -> Unit) -> Unit,
+    incomingBackupUri: android.net.Uri? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.CONNECTION) }
+    var selectedTab by rememberSaveable { mutableStateOf(SettingsTab.INSTANCES) }
 
-    // --- Connection state
-    var url by remember { mutableStateOf(HaSettings.loadUrl(context)) }
-    var token by remember { mutableStateOf(HaSettings.loadToken(context)) }
-
-    // --- Local URL state
-    var localUrlEnabled by remember { mutableStateOf(HaSettings.loadLocalUrlEnabled(context)) }
-    var localUrl by remember { mutableStateOf(HaSettings.loadLocalUrl(context)) }
-    var homeSsids by remember { mutableStateOf(HaSettings.loadHomeSsids(context)) }
-
-    // --- Client certificate state
-    var clientCertEnabled by remember { mutableStateOf(HaSettings.loadClientCertEnabled(context)) }
-    var clientCertAlias by remember { mutableStateOf(HaSettings.loadClientCertAlias(context)) }
-
-    // Single test status — shows which target was last tested.
-    var status by remember { mutableStateOf(Status.Idle) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var lastTestedLabel by remember { mutableStateOf<String?>(null) }
-    var testingLabel by remember { mutableStateOf<String?>(null) }
-    var saved by remember { mutableStateOf(false) }
-
-    val unsavedChanges by remember(
-        url, token, localUrlEnabled, localUrl, homeSsids, clientCertEnabled, clientCertAlias
-    ) {
-        mutableStateOf(
-            url != HaSettings.loadUrl(context) ||
-            token != HaSettings.loadToken(context) ||
-            localUrlEnabled != HaSettings.loadLocalUrlEnabled(context) ||
-            localUrl != HaSettings.loadLocalUrl(context) ||
-            homeSsids != HaSettings.loadHomeSsids(context) ||
-            clientCertEnabled != HaSettings.loadClientCertEnabled(context) ||
-            clientCertAlias != HaSettings.loadClientCertAlias(context)
-        )
+    LaunchedEffect(incomingBackupUri) {
+        if (incomingBackupUri != null) selectedTab = SettingsTab.OPTIONS
     }
 
-    fun setSaved() {
-        saved = true
-        scope.launch {
-            delay(1200)
-            saved = false
+    // Observe instances from repository
+    val instances by HaInstanceRepository.instances.collectAsState()
+    val activeInstanceId by HaInstanceRepository.activeInstanceId.collectAsState()
+
+    // Instance editor state
+    var editingInstance by remember { mutableStateOf<HaInstance?>(null) }
+    // WS enable flow state
+    var notificationGranted by remember { mutableStateOf(hasNotificationPermission(context)) }
+    var pendingWsInstance by remember { mutableStateOf<HaInstance?>(null) }
+    var showWsPopup by remember { mutableStateOf<HaInstance?>(null) }
+    // oldInstance to newInstance when switching WS between instances
+    var showSwitchConfirm by remember { mutableStateOf<Pair<HaInstance, HaInstance>?>(null) }
+
+    fun applyWsEnable(instance: HaInstance) {
+        instances.filter { it.wsEnabled && it.id != instance.id }.forEach { old ->
+            HaInstanceRepository.update(old.copy(wsEnabled = false))
         }
+        HaInstanceRepository.update(instance.copy(wsEnabled = true))
+        HaSettings.saveWebSocketEnabled(context, true)
+        HaWebSocketService.start(context)
+        HaInstanceRepository.setActive(instance.id)
     }
 
-    // --- Websocket state
-    var wsEnabled by remember { mutableStateOf(HaSettings.loadWebSocketEnabled(context)) }
-    var showBatteryDialog by remember { mutableStateOf(!hasSeenBatteryDialog(context) && wsEnabled) }
+    fun disableWs(instance: HaInstance) {
+        HaInstanceRepository.update(instance.copy(wsEnabled = false))
+        HaSettings.saveWebSocketEnabled(context, false)
+        HaWebSocketService.stop(context)
+    }
 
-    fun enableWebSocket() {
-
-        if (!hasSeenBatteryDialog(context)) {
-            showBatteryDialog = true
+    fun proceedEnableWs(instance: HaInstance) {
+        val otherActive = instances.firstOrNull { it.wsEnabled && it.id != instance.id }
+        if (otherActive != null) {
+            showSwitchConfirm = otherActive to instance
+        } else if (!hasWsPopupDismissed(context)) {
+            showWsPopup = instance
         } else {
-            wsEnabled = true
-            HaSettings.saveWebSocketEnabled(context, true)
-            HaWebSocketService.start(context)
+            applyWsEnable(instance)
         }
     }
 
@@ -127,75 +146,51 @@ fun MainSettingsScreen(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
         ) { granted ->
-            if (granted) {
-                enableWebSocket()
-            } else {
-                wsEnabled = false
-                HaSettings.saveWebSocketEnabled(context, false)
+            notificationGranted = granted
+            pendingWsInstance?.let { inst ->
+                if (granted) proceedEnableWs(inst)
+                // if denied, showWsPopup stays null; popup is not shown
             }
+            pendingWsInstance = null
         }
+
+    // HACS companion check state for main screen cards
+    var checkingHacsInstanceId by remember { mutableStateOf<String?>(null) }
+
+    fun checkHacsForInstance(instance: HaInstance) {
+        if (checkingHacsInstanceId != null) return
+        checkingHacsInstanceId = instance.id
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = instance.clientCertEnabled,
+            clientCertAlias = instance.clientCertAlias
+        )
+        val client = HomeAssistantClient(instance.remoteUrl.trim(), instance.token.trim(), httpClient)
+        scope.launch {
+            val services = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                    client.getServices()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            val hacsAvailable = services.any { it.domain == "taskerha_companion" }
+            HaInstanceRepository.update(instance.copy(hacsAvailable = hacsAvailable, hacsChecked = true))
+            checkingHacsInstanceId = null
+        }
+    }
 
     // --- Logging state
     var generalLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.GENERAL)) }
     var wsLevel by remember { mutableStateOf(HaSettings.loadLogLevel(context, LogChannel.WEBSOCKET)) }
 
-    val testing = testingLabel != null
-
-    // Top bar depends on selected tab
-    LaunchedEffect(selectedTab, unsavedChanges, testing, saved, url, token) {
+    // Simplified top bar - no save button needed for instances tab
+    LaunchedEffect(selectedTab) {
         setTopBar {
             TopAppBar(
-                title = { Text("TaskerHA Settings") },
-                actions = {
-                    if (selectedTab == SettingsTab.CONNECTION) {
-                        FilledIconButton(
-                            enabled = unsavedChanges && !testing && url.isNotBlank() && token.isNotBlank(),
-                            onClick = {
-                                HaSettings.save(context, url.trim(), token.trim())
-                                HaSettings.saveLocalUrlEnabled(context, localUrlEnabled)
-                                HaSettings.saveLocalUrl(context, localUrl.trim())
-                                HaSettings.saveHomeSsids(context, homeSsids)
-                                HaSettings.saveClientCertEnabled(context, clientCertEnabled)
-                                HaSettings.saveClientCertAlias(context, clientCertAlias)
-                                setSaved()
-                            }
-                        ) {
-                            if (saved) {
-                                Icon(Icons.Rounded.CheckCircle, contentDescription = "Saved")
-                            } else {
-                                Icon(Icons.Rounded.Save, contentDescription = "Save settings")
-                            }
-                        }
-                    }
-                }
+                title = { Text("TaskerHA Settings") }
             )
-        }
-    }
-
-    fun runTest(label: String, targetUrl: String) {
-        testingLabel = label
-        status = Status.Testing
-        lastTestedLabel = label
-        // Build a one-shot OkHttpClient honoring the IN-MEMORY cert toggle/alias
-        // so the user can test without saving first.
-        val httpClient = HaHttpClientFactory.build(
-            context,
-            clientCertEnabled = clientCertEnabled,
-            clientCertAlias = clientCertAlias
-        )
-        val client = HomeAssistantClient(targetUrl.trim(), token.trim(), httpClient)
-
-        scope.launch {
-            val success = withContext(Dispatchers.IO) {
-                try {
-                    client.ping()
-                } catch (_: Exception) {
-                    false
-                }
-            }
-            status = if (success) Status.Success else Status.Failed
-            testingLabel = null
-            error = client.error
         }
     }
 
@@ -214,57 +209,61 @@ fun MainSettingsScreen(
             }
         }
     ) { innerPadding ->
+        // INSTANCES tab uses LazyColumn which handles its own scrolling
+        // Other tabs need parent scroll for their static content
+        val needsScroll = selectedTab != SettingsTab.INSTANCES
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .then(
+                    if (needsScroll) Modifier.verticalScroll(rememberScrollState())
+                    else Modifier
+                )
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             when (selectedTab) {
-                SettingsTab.CONNECTION -> ConnectionTab(
-                    url = url,
-                    token = token,
-                    testing = testing,
-                    testingLabel = testingLabel,
-                    lastTestedLabel = lastTestedLabel,
-                    status = status,
-                    error = error,
-                    localUrlEnabled = localUrlEnabled,
-                    localUrl = localUrl,
-                    homeSsids = homeSsids,
-                    clientCertEnabled = clientCertEnabled,
-                    clientCertAlias = clientCertAlias,
-                    onUrlChange = { url = it },
-                    onTokenChange = { token = it },
-                    onLocalUrlEnabledChange = { localUrlEnabled = it },
-                    onLocalUrlChange = { localUrl = it },
-                    onHomeSsidsChange = { homeSsids = it },
-                    onClientCertEnabledChange = { clientCertEnabled = it },
-                    onClientCertAliasChange = { clientCertAlias = it },
-                    onTestRemote = { runTest("Remote", url) },
-                    onTestLocal = { runTest("Local", localUrl) }
-                )
-
-                SettingsTab.WEBSOCKET -> WebSocketTab(
-                    wsEnabled = wsEnabled,
-                    onToggle = { enabled ->
-                        if (enabled) {
-                            if (hasNotificationPermission(context)) {
-                                enableWebSocket()
-                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                wsEnabled = false
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            } else {
-                                enableWebSocket()
-                            }
-                        } else {
-                            wsEnabled = false
+                SettingsTab.INSTANCES -> InstancesTab(
+                    instances = instances,
+                    activeInstanceId = activeInstanceId,
+                    checkingHacsInstanceId = checkingHacsInstanceId,
+                    onAddInstance = {
+                        editingInstance = HaInstance(
+                            id = HaInstance.generateShortId(),
+                            name = "",
+                            remoteUrl = "",
+                            token = "",
+                            isDefault = instances.isEmpty()
+                        )
+                    },
+                    onEditInstance = { instance ->
+                        editingInstance = instance
+                    },
+                    onDeleteInstance = { instance ->
+                        if (instance.wsEnabled) {
                             HaSettings.saveWebSocketEnabled(context, false)
                             HaWebSocketService.stop(context)
                         }
-                    }
+                        HaInstanceRepository.delete(instance.id)
+                    },
+                    onSetDefault = { instance ->
+                        HaInstanceRepository.setDefault(instance.id)
+                    },
+                    onToggleWs = { instance, enabled ->
+                        if (enabled) {
+                            if (!notificationGranted && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                pendingWsInstance = instance
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                proceedEnableWs(instance)
+                            }
+                        } else {
+                            disableWs(instance)
+                        }
+                    },
+                    onCheckHacs = { instance -> checkHacsForInstance(instance) }
                 )
 
                 SettingsTab.LOGGING -> LoggingTab(
@@ -293,48 +292,593 @@ fun MainSettingsScreen(
                     }
                 )
 
+                SettingsTab.OPTIONS -> OptionsTab(incomingBackupUri = incomingBackupUri)
+
                 SettingsTab.TRIGGERS -> ActiveTriggersTab()
             }
         }
     }
 
-    // Battery dialog stays global because it can be triggered from the websocket tab
-    if (showBatteryDialog) {
+    // WS first-enable info popup
+    showWsPopup?.let { instance ->
+        WsInfoDialog(
+            notificationGranted = notificationGranted || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU,
+            onRequestPermission = {
+                pendingWsInstance = instance
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+            onEnable = { neverShowAgain ->
+                if (neverShowAgain) setWsPopupDismissed(context)
+                showWsPopup = null
+                applyWsEnable(instance)
+            },
+            onDismiss = { showWsPopup = null }
+        )
+    }
+
+    // Switch WS between instances confirmation
+    showSwitchConfirm?.let { (oldInstance, newInstance) ->
+        val oldName = oldInstance.name.takeIf { it.isNotBlank() } ?: oldInstance.remoteUrl
+        val newName = newInstance.name.takeIf { it.isNotBlank() } ?: newInstance.remoteUrl
         AlertDialog(
-            onDismissRequest = { showBatteryDialog = false },
-            title = { Text("Allow background activity") },
+            onDismissRequest = { showSwitchConfirm = null },
+            title = { Text("Switch WebSocket instance?") },
             text = {
                 Text(
-                    "To reliably receive Home Assistant triggers, Android must allow this app " +
-                            "to run in the background.\n\n" +
-                            "On the next screen, open Battery and set it to allow background activity " +
-                            "or Unrestricted (wording may differ per device)."
+                    "WebSocket triggers are currently active for \"$oldName\". " +
+                        "Switch to \"$newName\"? The connection will reconnect to the new instance."
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showBatteryDialog = false
-                        setBatteryDialogShown(context)
-                        openAppBatterySettings(context)
-                        wsEnabled = true
-                        HaSettings.saveWebSocketEnabled(context, true)
-                        HaWebSocketService.start(context)
+                        showSwitchConfirm = null
+                        applyWsEnable(newInstance)
                     }
-                ) { Text("Open settings") }
+                ) { Text("Switch") }
             },
             dismissButton = {
-                TextButton(
-                    onClick = {
-                        showBatteryDialog = false
-                        wsEnabled = false
-                        HaSettings.saveWebSocketEnabled(context, false)
-                        HaWebSocketService.stop(context)
-                    }
-                ) { Text("Not now") }
+                TextButton(onClick = { showSwitchConfirm = null }) { Text("Cancel") }
             }
         )
     }
+
+    // Instance editor dialog
+    editingInstance?.let { instance ->
+        InstanceEditorDialog(
+            instance = instance,
+            onDismiss = { editingInstance = null },
+            onSave = { updatedInstance ->
+                if (instances.any { it.id == updatedInstance.id }) {
+                    HaInstanceRepository.update(updatedInstance)
+                } else {
+                    HaInstanceRepository.add(updatedInstance)
+                }
+                editingInstance = null
+            }
+        )
+    }
+
+}
+
+@Composable
+private fun InstancesTab(
+    instances: List<HaInstance>,
+    activeInstanceId: String?,
+    checkingHacsInstanceId: String?,
+    onAddInstance: () -> Unit,
+    onEditInstance: (HaInstance) -> Unit,
+    onDeleteInstance: (HaInstance) -> Unit,
+    onSetDefault: (HaInstance) -> Unit,
+    onToggleWs: (HaInstance, Boolean) -> Unit,
+    onCheckHacs: (HaInstance) -> Unit,
+) {
+    val sortedInstances = HaInstanceRepository.getAllSorted()
+    
+    if (instances.isEmpty()) {
+        // Empty state
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                "No instances configured",
+                style = MaterialTheme.typography.headlineSmall
+            )
+            Text(
+                "Add your first Home Assistant instance to get started",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(onClick = onAddInstance) {
+                Icon(Icons.Rounded.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Add Instance")
+            }
+        }
+        return
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(bottom = 80.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(sortedInstances, key = { it.id }) { instance ->
+                InstanceCard(
+                    instance = instance,
+                    isActive = instance.id == activeInstanceId,
+                    isCheckingHacs = checkingHacsInstanceId == instance.id,
+                    onEdit = { onEditInstance(instance) },
+                    onDelete = { onDeleteInstance(instance) },
+                    onSetDefault = { onSetDefault(instance) },
+                    onToggleWs = { enabled -> onToggleWs(instance, enabled) },
+                    onCheckHacs = { onCheckHacs(instance) }
+                )
+            }
+        }
+
+        // FAB for adding instances
+        FloatingActionButton(
+            onClick = onAddInstance,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            Icon(Icons.Rounded.Add, contentDescription = "Add instance")
+        }
+    }
+}
+
+@Composable
+private fun InstanceCard(
+    instance: HaInstance,
+    isActive: Boolean,
+    isCheckingHacs: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onSetDefault: () -> Unit,
+    onToggleWs: (Boolean) -> Unit,
+    onCheckHacs: () -> Unit,
+) {
+    val wsState by HaWebSocketService.connectionState.collectAsState()
+    val wsStatus = when {
+        !instance.wsEnabled || !isActive -> "Off"
+        wsState == WsConnectionState.CONNECTED -> "Connected"
+        wsState == WsConnectionState.CONNECTING -> "Connecting..."
+        wsState == WsConnectionState.FAILED -> "Failed"
+        else -> "Connecting..."
+    }
+    val isConnected = instance.wsEnabled && isActive &&
+        wsState == WsConnectionState.CONNECTED
+    val dotColor = when {
+        !instance.wsEnabled || !isActive -> MaterialTheme.colorScheme.outline
+        wsState == WsConnectionState.CONNECTED -> Color(0xFF4CAF50)
+        wsState == WsConnectionState.CONNECTING -> Color(0xFFFFA000)
+        wsState == WsConnectionState.FAILED -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.outline
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header: dot + name + chips
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Canvas(modifier = Modifier.size(10.dp)) {
+                    drawCircle(color = dotColor)
+                }
+                if (instance.name.isNotBlank()) {
+                    Text(instance.name, style = MaterialTheme.typography.titleMedium)
+                }
+                if (instance.isDefault) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            "Default",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                if (isActive) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            "Active",
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    }
+                }
+            }
+
+            // URLs
+            Text(
+                instance.remoteUrl.takeIf { it.isNotBlank() } ?: "(No URL)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (instance.localUrl.isNotBlank()) {
+                Text(
+                    "Local: ${instance.localUrl}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // HACS companion badge
+            when {
+                instance.hacsAvailable -> Surface(
+                    color = Color(0xFF4CAF50).copy(alpha = 0.15f),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFF4CAF50)
+                        )
+                        Text(
+                            "TaskerHA Companion",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF4CAF50)
+                        )
+                    }
+                }
+                else -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Surface(
+                        color = Color(0xFFFFA000).copy(alpha = 0.15f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFFFFA000)
+                            )
+                            Text(
+                                if (!instance.hacsChecked) "Companion not checked"
+                                else "Companion not found",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFFA000)
+                            )
+                        }
+                    }
+                    if (isCheckingHacs) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Color(0xFFFFA000)
+                        )
+                    } else {
+                        IconButton(
+                            onClick = onCheckHacs,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Rounded.Refresh,
+                                contentDescription = "Check companion",
+                                modifier = Modifier.size(16.dp),
+                                tint = Color(0xFFFFA000)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // WebSocket row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "WebSocket triggers",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        wsStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = when {
+                            isConnected -> MaterialTheme.colorScheme.primary
+                            instance.wsEnabled && isActive &&
+                                wsState == WsConnectionState.FAILED ->
+                                    MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Switch(
+                        checked = instance.wsEnabled,
+                        onCheckedChange = onToggleWs
+                    )
+                }
+            }
+
+            // Action buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Edit")
+                }
+                OutlinedButton(
+                    onClick = onSetDefault,
+                    enabled = !instance.isDefault,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Set Default")
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Rounded.Delete,
+                        contentDescription = "Delete instance",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InstanceEditorDialog(
+    instance: HaInstance,
+    onDismiss: () -> Unit,
+    onSave: (HaInstance) -> Unit
+) {
+    var name by remember { mutableStateOf(instance.name) }
+    var remoteUrl by remember { mutableStateOf(instance.remoteUrl) }
+    var localUrl by remember { mutableStateOf(instance.localUrl) }
+    var token by remember { mutableStateOf(instance.token) }
+    var homeSsids by remember { mutableStateOf(instance.homeSsids) }
+    var localUrlEnabled by remember { mutableStateOf(instance.localUrl.isNotBlank() || instance.homeSsids.isNotEmpty()) }
+    var clientCertEnabled by remember { mutableStateOf(instance.clientCertEnabled) }
+    var clientCertAlias by remember { mutableStateOf(instance.clientCertAlias) }
+    var hacsAvailable by remember { mutableStateOf(instance.hacsAvailable) }
+    var hacsChecked by remember { mutableStateOf(instance.hacsChecked) }
+    var hacsChecking by remember { mutableStateOf(false) }
+
+    var status by remember { mutableStateOf(Status.Idle) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var testingLabel by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    fun checkHacs() {
+        hacsChecking = true
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = clientCertEnabled,
+            clientCertAlias = clientCertAlias
+        )
+        val client = HomeAssistantClient(remoteUrl.trim(), token.trim(), httpClient)
+        scope.launch {
+            val services = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                    client.getServices()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+            hacsAvailable = services.any { it.domain == "taskerha_companion" }
+            hacsChecked = true
+            hacsChecking = false
+        }
+    }
+
+    fun runTest(label: String, targetUrl: String) {
+        testingLabel = label
+        status = Status.Testing
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = clientCertEnabled,
+            clientCertAlias = clientCertAlias
+        )
+        val client = HomeAssistantClient(targetUrl.trim(), token.trim(), httpClient)
+
+        scope.launch {
+            val success = withContext(Dispatchers.IO) {
+                try {
+                    client.ping()
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            status = if (success) Status.Success else Status.Failed
+            testingLabel = null
+            error = client.error
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(if (instance.remoteUrl.isBlank()) "Add Instance" else "Edit Instance")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name (optional)") },
+                    placeholder = { Text("Home, Office, etc.") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = remoteUrl,
+                    onValueChange = { remoteUrl = it },
+                    label = { Text("Remote URL") },
+                    placeholder = { Text("https://ha.example.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = token,
+                    onValueChange = { token = it },
+                    label = { Text("Access Token") },
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true
+                )
+
+                ClientCertSection(
+                    enabled = clientCertEnabled,
+                    alias = clientCertAlias,
+                    onEnabledChange = { clientCertEnabled = it },
+                    onAliasChange = { clientCertAlias = it }
+                )
+
+                val canTestRemote = testingLabel == null && remoteUrl.isNotBlank() && token.isNotBlank()
+                Button(
+                    enabled = canTestRemote,
+                    onClick = { runTest("Remote", remoteUrl) }
+                ) {
+                    Text(if (testingLabel == "Remote") "Testing..." else "Test Connection")
+                }
+                StatusRow(status, error)
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                LocalUrlSection(
+                    enabled = localUrlEnabled,
+                    localUrl = localUrl,
+                    homeSsids = homeSsids,
+                    onEnabledChange = { enabled ->
+                        localUrlEnabled = enabled
+                        if (!enabled) {
+                            localUrl = ""
+                            homeSsids = emptySet()
+                        }
+                    },
+                    onLocalUrlChange = { localUrl = it },
+                    onHomeSsidsChange = { homeSsids = it }
+                )
+
+                val canTestLocal = testingLabel == null && localUrl.isNotBlank() && token.isNotBlank()
+                if (localUrlEnabled && localUrl.isNotBlank()) {
+                    Button(
+                        enabled = canTestLocal,
+                        onClick = { runTest("Local", localUrl) }
+                    ) {
+                        Text(if (testingLabel == "Local") "Testing..." else "Test Local")
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("TaskerHA Companion", style = MaterialTheme.typography.bodyMedium)
+                        val hacsLabel = when {
+                            hacsChecking -> "Checking..."
+                            !hacsChecked -> "Not checked"
+                            hacsAvailable -> "Integration found"
+                            else -> "Integration not found"
+                        }
+                        val hacsColor = if (!hacsChecking && hacsChecked && hacsAvailable) Color(0xFF4CAF50)
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        Text(
+                            hacsLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = hacsColor
+                        )
+                    }
+                    IconButton(
+                        onClick = { checkHacs() },
+                        enabled = !hacsChecking && remoteUrl.isNotBlank() && token.isNotBlank()
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = "Refresh HACS check")
+                    }
+                    IconButton(
+                        onClick = {
+                            val intent = android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                "https://github.com/db1996/taskerha-hacs".toUri()
+                            )
+                            context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    ) {
+                        Icon(Icons.Rounded.Info, contentDescription = "About TaskerHA Companion")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = remoteUrl.isNotBlank() && token.isNotBlank(),
+                onClick = {
+                    onSave(
+                        instance.copy(
+                            name = name.trim(),
+                            remoteUrl = remoteUrl.trim(),
+                            localUrl = localUrl.trim(),
+                            token = token.trim(),
+                            homeSsids = homeSsids,
+                            clientCertEnabled = clientCertEnabled,
+                            clientCertAlias = clientCertAlias,
+                            hacsAvailable = hacsAvailable,
+                            hacsChecked = hacsChecked
+                        )
+                    )
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 @Composable
@@ -458,7 +1002,6 @@ private fun LocalUrlSection(
                 Toast.LENGTH_LONG
             ).show()
         }
-        pendingAction = null
     }
 
     fun withLocationPermission(action: () -> Unit) {
@@ -555,7 +1098,6 @@ private fun LocalUrlSection(
         enabled = !detecting,
         onClick = {
             withLocationPermission {
-                detecting = true
                 scope.launch {
                     // The long-lived NetworkCallback may not have fired yet
                     // (especially if monitoring just started). Poll the cache
@@ -567,7 +1109,6 @@ private fun LocalUrlSection(
                         currentSsid = NetworkHelper.getCurrentSsid()
                         attempts++
                     }
-                    detecting = false
                     if (currentSsid != null) {
                         onHomeSsidsChange(homeSsids + currentSsid)
                     } else {
@@ -703,28 +1244,474 @@ private fun findActivity(context: Context): Activity? {
 }
 
 @Composable
-private fun WebSocketTab(
-    wsEnabled: Boolean,
-    onToggle: (Boolean) -> Unit
+private fun WsInfoDialog(
+    notificationGranted: Boolean,
+    onRequestPermission: () -> Unit,
+    onEnable: (neverShowAgain: Boolean) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text("Enable background HA triggers")
-        Switch(
-            checked = wsEnabled,
-            onCheckedChange = onToggle
+    val context = LocalContext.current
+    var neverShow by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Background HA triggers") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Keeps a persistent WebSocket connection to Home Assistant so Tasker " +
+                        "profiles can fire from HA state changes and custom events."
+                )
+                Text(
+                    "For more details, see the TaskerHA documentation on GitHub.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                HorizontalDivider()
+
+                Text("Notification access", style = MaterialTheme.typography.titleSmall)
+                if (notificationGranted) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            "Notification access granted",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            "Required to show the background service notification",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onRequestPermission,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Grant notification access")
+                    }
+                }
+
+                HorizontalDivider()
+
+                Text("Battery optimization", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "For reliable triggers, set Battery usage to Unrestricted in Android settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { openAppBatterySettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open battery settings")
+                }
+
+                HorizontalDivider()
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(checked = neverShow, onCheckedChange = { neverShow = it })
+                    Text("Don't show this again", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (!notificationGranted) {
+                        Toast.makeText(context, "Grant notification access first", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onEnable(neverShow)
+                    }
+                }
+            ) { Text("Enable") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Serializable
+private data class GitHubRelease(val tag_name: String = "")
+
+@Serializable
+private data class FDroidPackageEntry(val versionName: String = "", val versionCode: Int = 0)
+
+@Serializable
+private data class FDroidPackage(
+    val suggestedVersionCode: Int = 0,
+    val packages: List<FDroidPackageEntry> = emptyList()
+) {
+    val suggestedVersionName: String
+        get() = packages.firstOrNull { it.versionCode == suggestedVersionCode }?.versionName ?: ""
+}
+
+private val lenientJson = Json { ignoreUnknownKeys = true }
+
+@Composable
+private fun OptionsTab(incomingBackupUri: android.net.Uri? = null) {
+    val context = LocalContext.current
+
+    // Notification permission
+    var hasNotifPermission by remember { mutableStateOf(hasNotificationPermission(context)) }
+    val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        hasNotifPermission = granted
+    }
+    var showDisableNotifDialog by remember { mutableStateOf(false) }
+
+    val instances by HaInstanceRepository.instances.collectAsState()
+
+    // Battery optimization — refresh status on every resume so the card updates after returning from settings
+    val pm = context.getSystemService(PowerManager::class.java)
+    var ignoringBattery by remember {
+        mutableStateOf(pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false)
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                ignoringBattery = pm?.isIgnoringBatteryOptimizations(context.packageName) ?: false
+                hasNotifPermission = hasNotificationPermission(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    var showBatteryDialog by remember { mutableStateOf(false) }
+
+    // Version info
+    val currentVersion = remember {
+        try {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "Unknown"
+        } catch (_: Exception) { "Unknown" }
+    }
+    var githubVersion by remember { mutableStateOf<String?>(null) }
+    var fdroidVersion by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val httpClient = OkHttpClient()
+        launch {
+            val version = withContext(Dispatchers.IO) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://api.github.com/repos/db1996/TaskerHa/releases/latest")
+                        .header("Accept", "application/vnd.github+json")
+                        .build()
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body?.string() ?: return@use "Unknown"
+                            val release = lenientJson.decodeFromString<GitHubRelease>(body)
+                            release.tag_name.trimStart('v')
+                        } else "Unknown"
+                    }
+                } catch (_: Exception) { "Unknown" }
+            }
+            githubVersion = version
+        }
+        launch {
+            val version = withContext(Dispatchers.IO) {
+                try {
+                    val request = Request.Builder()
+                        .url("https://f-droid.org/api/v1/packages/com.github.db1996.taskerha")
+                        .build()
+                    httpClient.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body?.string() ?: return@use "Not available"
+                            val pkg = lenientJson.decodeFromString<FDroidPackage>(body)
+                            pkg.suggestedVersionName.ifBlank { "Unknown" }
+                        } else "Not available"
+                    }
+                } catch (_: Exception) { "Unknown" }
+            }
+            fdroidVersion = version
+        }
+    }
+
+    // Request timeout — track raw text so the field is editable mid-type
+    var timeoutText by remember { mutableStateOf(HaSettings.loadRequestTimeout(context).toString()) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            "General",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        // Notification permission card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Notifications", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        if (hasNotifPermission) "Permission granted" else "Permission not granted",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (hasNotifPermission) Color(0xFF4CAF50) else Color(0xFFFFA000)
+                    )
+                }
+                Switch(
+                    checked = hasNotifPermission,
+                    onCheckedChange = { on ->
+                        if (on) {
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        } else {
+                            showDisableNotifDialog = true
+                        }
+                    }
+                )
+            }
+        }
+
+        // Battery optimization card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Battery optimization", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            if (ignoringBattery) "Unrestricted" else "Restricted",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (ignoringBattery) Color(0xFF4CAF50) else Color(0xFFFFA000)
+                        )
+                    }
+                    IconButton(onClick = { showBatteryDialog = true }) {
+                        Icon(Icons.Rounded.Info, contentDescription = "Info")
+                    }
+                }
+                OutlinedButton(
+                    onClick = { openAppBatterySettings(context) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Open settings")
+                }
+            }
+        }
+
+        // Request timeout card
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Request timeout", style = MaterialTheme.typography.bodyMedium)
+                OutlinedTextField(
+                    value = timeoutText,
+                    onValueChange = { raw ->
+                        // Allow only digits, cap at 4 chars to prevent absurd values
+                        val filtered = raw.filter { it.isDigit() }.take(4)
+                        timeoutText = filtered
+                        val v = filtered.toIntOrNull()
+                        if (v != null && v >= 1) {
+                            HaSettings.saveRequestTimeout(context, v)
+                        }
+                    },
+                    label = { Text("Seconds") },
+                    suffix = { Text("s") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Time a single request has to reach Home Assistant, set this higher if you have a slower connection. You can set it lower if you have fast connections but this could result in more reconnections of the websocket",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Applies to all Home Assistant connections. Default: 5s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        // Backup & Restore section
+        BackupRestoreSection(incomingUri = incomingBackupUri)
+
+        // About section
+        Text(
+            "About",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    VersionRow("Current version", currentVersion)
+                    VersionRow("Latest (GitHub)", githubVersion)
+                    VersionRow("Latest (F-Droid)", fdroidVersion)
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AboutLinkRow(
+                    label = "Documentation",
+                    url = "https://taskerha.db1996-gh.com/"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AboutLinkRow(
+                    label = "Repository",
+                    url = "https://github.com/db1996/TaskerHa"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AboutLinkRow(
+                    label = "Report bug or feature request",
+                    url = "https://github.com/db1996/TaskerHa/issues"
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AboutLinkRow(
+                    label = "Install companion HACS integration",
+                    url = "https://github.com/db1996/taskerha-hacs"
+                )
+            }
+        }
+
+        // Buy Me a Coffee button
+        Button(
+            onClick = {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, "https://buymeacoffee.com/db1996".toUri())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFDD00)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                "☕  Buy me a coffee",
+                color = Color(0xFF000000),
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+//        Text(
+//            "Debug",
+//            style = MaterialTheme.typography.titleSmall,
+//            color = MaterialTheme.colorScheme.primary
+//        )
+//
+//        Card(modifier = Modifier.fillMaxWidth()) {
+//            OutlinedButton(
+//                onClick = {
+//                    PingManager.clearDeviceId(context)
+//                    Toast.makeText(context, "Device UUID cleared", Toast.LENGTH_SHORT).show()
+//                },
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(12.dp)
+//            ) {
+//                Text("Reset device UUID")
+//            }
+//        }
+    }
+
+    if (showDisableNotifDialog) {
+        AlertDialog(
+            onDismissRequest = { showDisableNotifDialog = false },
+            title = { Text("Disable notifications?") },
+            text = {
+                Text(
+                    "Notification permission is required for the WebSocket background service. " +
+                    "Disabling it will stop WebSocket triggers.\n\n" +
+                    "You will be taken to app settings to revoke the permission."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDisableNotifDialog = false
+                    // Disable WS for all instances
+                    instances.filter { it.wsEnabled }.forEach { inst ->
+                        HaInstanceRepository.update(inst.copy(wsEnabled = false))
+                    }
+                    HaSettings.saveWebSocketEnabled(context, false)
+                    HaWebSocketService.stop(context)
+                    // Open notification settings so user can revoke the permission
+                    context.startActivity(
+                        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    )
+                }) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDisableNotifDialog = false }) { Text("Cancel") }
+            }
         )
     }
 
-    Spacer(Modifier.height(8.dp))
-
-    Text(
-        "Keeps a persistent WebSocket connection to Home Assistant so Tasker profile events can trigger from HA events."
-    )
-    Text("It listens to state changes and your custom event channel.")
-    Text("For reliability, you may need to set Battery usage to Unrestricted / allow background activity.")
+    if (showBatteryDialog) {
+        AlertDialog(
+            onDismissRequest = { showBatteryDialog = false },
+            title = { Text("Battery optimization") },
+            text = {
+                Text(
+                    "Android may restrict background services to save battery. " +
+                    "For reliable WebSocket triggers, set TaskerHA to Unrestricted in battery settings.\n\n" +
+                    "Current status: ${if (ignoringBattery) "Unrestricted ✓" else "Restricted"}"
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBatteryDialog = false
+                    openAppBatterySettings(context)
+                }) { Text("Open settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBatteryDialog = false }) { Text("Close") }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -777,7 +1764,7 @@ private fun LogLevelDropdown(
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
+        onExpandedChange = { !expanded }
     ) {
         OutlinedTextField(
             modifier = Modifier
@@ -791,7 +1778,7 @@ private fun LogLevelDropdown(
 
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false }
+            onDismissRequest = { }
         ) {
             options.forEach { lvl ->
                 DropdownMenuItem(
@@ -802,7 +1789,6 @@ private fun LogLevelDropdown(
                         }
                     },
                     onClick = {
-                        expanded = false
                         onChange(lvl)
                     }
                 )
@@ -828,16 +1814,73 @@ enum class Status {
 }
 
 private const val PREFS_NAME = "settings"
-private const val KEY_BATTERY_DIALOG_SHOWN = "battery_dialog_shown"
+private const val KEY_WS_POPUP_DISMISSED = "ws_popup_dismissed"
 
-fun hasSeenBatteryDialog(context: Context): Boolean {
+fun hasWsPopupDismissed(context: Context): Boolean {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return prefs.getBoolean(KEY_BATTERY_DIALOG_SHOWN, false)
+    return prefs.getBoolean(KEY_WS_POPUP_DISMISSED, false)
 }
 
-fun setBatteryDialogShown(context: Context, value: Boolean = true) {
+fun setWsPopupDismissed(context: Context) {
     val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    prefs.edit { putBoolean(KEY_BATTERY_DIALOG_SHOWN, value) }
+    prefs.edit { putBoolean(KEY_WS_POPUP_DISMISSED, true) }
+}
+
+@Composable
+private fun VersionRow(label: String, value: String?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            value ?: "...",
+            style = MaterialTheme.typography.bodySmall,
+            color = if (value == null) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+private fun AboutLinkRow(label: String, url: String) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, url.toUri())
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_github),
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+        )
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            Icons.Rounded.OpenInNew,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 fun openAppBatterySettings(context: Context) {

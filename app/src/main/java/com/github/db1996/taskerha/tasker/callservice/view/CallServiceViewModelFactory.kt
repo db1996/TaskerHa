@@ -5,12 +5,12 @@ import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.tasker.base.ClientViewModelFactory
 
 class CallServiceViewModelFactory(
-    context: Context
+    private val context: Context
 ) : ClientViewModelFactory<CallServiceViewModel>(context) {
 
     override val viewModelClass = CallServiceViewModel::class.java
 
     override fun createViewModel(client: HomeAssistantClient): CallServiceViewModel {
-        return CallServiceViewModel(client)
+        return CallServiceViewModel(context, client)
     }
 }

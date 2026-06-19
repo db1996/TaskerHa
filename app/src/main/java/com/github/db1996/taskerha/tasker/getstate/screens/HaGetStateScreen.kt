@@ -4,11 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,6 +16,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.partials.InstanceConnectionStatus
+import com.github.db1996.taskerha.activities.partials.InstanceSelector
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.getstate.data.HaGetStateBuiltForm
 import com.github.db1996.taskerha.tasker.getstate.view.HaGetStateViewModel
@@ -23,9 +26,11 @@ import com.github.db1996.taskerha.tasker.getstate.view.HaGetStateViewModel
 @Composable
 fun HaGetStateScreen(
     viewModel: HaGetStateViewModel,
-    onSave: (HaGetStateBuiltForm) -> Unit
+    onSave: (HaGetStateBuiltForm) -> Unit,
+    isNewAction: Boolean = false
 ) {
     var entitySearching by remember { mutableStateOf(false) }
+    val instances by HaInstanceRepository.instances.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadEntities()
@@ -48,33 +53,46 @@ fun HaGetStateScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Error message
-            if (viewModel.clientError.isNotEmpty()) {
-                Text(
-                    text = viewModel.clientError,
-                    color = MaterialTheme.colorScheme.error
-                )
-                Text("Please check your connection settings in the main app outside of tasker")
-            }
-
-            if (entitySearching) {
-                TextField(
-                    value = viewModel.currentDomainSearch,
-                    onValueChange = { viewModel.currentDomainSearch = it },
-                    label = { Text("Filter domain") },
-                    modifier = Modifier.fillMaxWidth()
+            // Instance selector (only for new actions)
+            if (instances.isNotEmpty()) {
+                InstanceSelector(
+                    instances = instances,
+                    selectedInstanceId = form.instanceId,
+                    onInstanceSelected = { instanceId ->
+                        if (isNewAction) {
+                            viewModel.changeInstance(instanceId)
+                        }
+                    },
+                    enabled = isNewAction
                 )
             }
 
-            EntitySelector(
-                entities = viewModel.entities,
-                serviceDomain = viewModel.currentDomainSearch,
-                currentEntityId = form.entityId,
-                searching = entitySearching,
-                onSearchChanged = { entitySearching = it },
-                onEntitySelected = { viewModel.pickEntity(it) },
-                onEntityIdChanged = { viewModel.updateEntityId( it)},
-            )
+            InstanceConnectionStatus(
+                isLoading = viewModel.isLoadingInstance,
+                error = viewModel.clientError,
+                onRetry = viewModel::retryLoad
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (entitySearching) {
+                        TextField(
+                            value = viewModel.currentDomainSearch,
+                            onValueChange = { viewModel.currentDomainSearch = it },
+                            label = { Text("Filter domain") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    EntitySelector(
+                        entities = viewModel.entities,
+                        serviceDomain = viewModel.currentDomainSearch,
+                        currentEntityId = form.entityId,
+                        searching = entitySearching,
+                        onSearchChanged = { entitySearching = it },
+                        onEntitySelected = { viewModel.pickEntity(it) },
+                        onEntityIdChanged = { viewModel.updateEntityId(it) },
+                    )
+                }
+            }
         }
     }
 }

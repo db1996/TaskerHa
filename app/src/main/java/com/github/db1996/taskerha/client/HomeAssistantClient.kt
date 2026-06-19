@@ -3,6 +3,7 @@ package com.github.db1996.taskerha.client
 import com.github.db1996.taskerha.datamodels.ActualService
 import com.github.db1996.taskerha.datamodels.HaDomainService
 import com.github.db1996.taskerha.datamodels.HaEntity
+import com.github.db1996.taskerha.datamodels.HaRegistryData
 import com.github.db1996.taskerha.datamodels.HaService
 import com.github.db1996.taskerha.datamodels.HaServiceField
 import com.github.db1996.taskerha.datamodels.Option
@@ -50,6 +51,7 @@ class HomeAssistantClient(
     var result: String = ""
     private var services: List<HaDomainService> = emptyList()
     private var entities: List<HaEntity> = emptyList()
+    private var registryData: HaRegistryData? = null
 
     init {
         validateSettings()
@@ -108,7 +110,7 @@ class HomeAssistantClient(
             .header("Authorization", "Bearer $accessToken")
             .build()
 
-    private fun request(path: String, method: String, body: String?): Request {
+    private fun request(path: String, body: String?, method: String = "POST"): Request {
         val requestBody = body?.toRequestBody("application/json".toMediaType())
         return Request.Builder()
             .url("$baseUrl$path")
@@ -121,17 +123,17 @@ class HomeAssistantClient(
     // --- API calls
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
         try {
-            val response = http.newCall(request("/api/")).execute()
-            logVerbose("Ping url ${response.request.url}")
-
-            if (!response.isSuccessful) {
-                val body = runCatching { response.body?.string() }.getOrNull()
-                error = formatHttpError(response, body)
-                homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                false
-            } else {
-                homeAssistantStatus = HomeassistantStatus.CONNECTED
-                true
+            http.newCall(request("/api/")).execute().use { response ->
+                logVerbose("Ping url ${response.request.url}")
+                if (!response.isSuccessful) {
+                    val body = runCatching { response.body?.string() }.getOrNull()
+                    error = formatHttpError(response, body)
+                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                    false
+                } else {
+                    homeAssistantStatus = HomeassistantStatus.CONNECTED
+                    true
+                }
             }
         } catch (e: Exception) {
             error = formatException(e)
@@ -145,18 +147,16 @@ class HomeAssistantClient(
         if (entities.isNotEmpty()) return@withContext entities
 
         try {
-            val response = http.newCall(request("/api/states")).execute()
-            val body = response.body?.string()
-            if (!response.isSuccessful) {
-                error = formatHttpError(response, body)
-                return@withContext emptyList()
+            http.newCall(request("/api/states")).execute().use { response ->
+                val body = response.body?.string()
+                if (!response.isSuccessful) {
+                    error = formatHttpError(response, body)
+                    return@withContext emptyList()
+                }
+                if (body == null) return@withContext emptyList()
+                entities = json.decodeFromString(body)
+                entities
             }
-
-            if (body == null) return@withContext emptyList()
-            entities = json.decodeFromString(body)
-            entities
-
-
         } catch (e: Exception) {
             error = formatException(e)
             emptyList()
@@ -171,17 +171,17 @@ class HomeAssistantClient(
             if (services.isNotEmpty() && !force) return@withContext services
 
             try {
-                val response = http.newCall(request("/api/services")).execute()
-                val body = response.body?.string()
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, body)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    return@withContext emptyList()
+                http.newCall(request("/api/services")).execute().use { response ->
+                    val body = response.body?.string()
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, body)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        return@withContext emptyList()
+                    }
+                    if (body == null) return@withContext emptyList()
+                    services = json.decodeFromString(body)
+                    services
                 }
-
-                if (body == null) return@withContext emptyList()
-                services = json.decodeFromString(body)
-                services
             } catch (e: Exception) {
                 error = formatException(e)
                 homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
@@ -199,6 +199,25 @@ class HomeAssistantClient(
         }
     }
 
+    suspend fun getRegistryData(force: Boolean = false): HaRegistryData? =
+        withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext null
+            if (registryData != null && !force) return@withContext registryData
+
+            try {
+                http.newCall(
+                    request("/api/services/taskerha_companion/get_registry_data?return_response", "{}")
+                ).execute().use { response ->
+                    val responseBody = response.body?.string()
+                    if (!response.isSuccessful || responseBody == null) return@withContext null
+                    registryData = json.decodeFromString<HaRegistryData>(responseBody)
+                    registryData
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+
     suspend fun getState(entityId: String): Boolean =
         withContext(Dispatchers.IO) {
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
@@ -206,16 +225,17 @@ class HomeAssistantClient(
             val req = request("/api/states/$entityId")
             logVerbose("url: ${req.url}")
             try {
-                val response = http.newCall(req).execute()
-                logVerbose("Response: $response")
-                result = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, result)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    false
-                } else {
-                    homeAssistantStatus = HomeassistantStatus.CONNECTED
-                    true
+                http.newCall(req).execute().use { response ->
+                    logVerbose("Response: $response")
+                    result = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, result)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        false
+                    } else {
+                        homeAssistantStatus = HomeassistantStatus.CONNECTED
+                        true
+                    }
                 }
             } catch (e: IOException) {
                 error = formatException(e)
@@ -224,37 +244,60 @@ class HomeAssistantClient(
             }
         }
 
-
-
-    suspend fun callService(domain: String, service: String, entityId: String, data: Map<String, Any>? = null): Boolean =
+    suspend fun getEntityAttributeKeys(entityId: String): List<String> =
         withContext(Dispatchers.IO) {
+            if (homeAssistantStatus != HomeassistantStatus.CONNECTED) return@withContext emptyList()
+            try {
+                http.newCall(request("/api/states/$entityId")).execute().use { response ->
+                    val body = response.body?.string()
+                    if (!response.isSuccessful || body == null) return@withContext emptyList()
+                    val detail = json.decodeFromString<com.github.db1996.taskerha.datamodels.HaEntityStateDetail>(body)
+                    detail.attributes.keys.toList()
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+    suspend fun callService(
+        domain: String,
+        service: String,
+        entityId: String = "",
+        data: Map<String, Any>? = null,
+        target: Map<String, List<String>>? = null
+    ): Boolean = withContext(Dispatchers.IO) {
             if (homeAssistantStatus != HomeassistantStatus.CONNECTED) throw Exception(error)
 
-            val payload = mutableMapOf<String, Any>()
-            if (entityId.isNotEmpty()) payload["entity_id"] = entityId
-            data?.let { payload.putAll(it) }
+            val rootPayload = mutableMapOf<String, JsonElement>()
 
-            logVerbose("Payload: $payload")
+            if (target != null) {
+                target.filterValues { it.isNotEmpty() }.forEach { (key, ids) ->
+                    rootPayload[key] = JsonArray(ids.map { JsonPrimitive(it) })
+                }
+            } else if (entityId.isNotEmpty()) {
+                rootPayload["entity_id"] = JsonPrimitive(entityId)
+            }
 
-            val body = json.encodeToString(
-                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
-                payload.mapValues { JsonPrimitive(it.value.toString()) }
-            )
+            data?.forEach { (key, value) -> rootPayload[key] = JsonPrimitive(value.toString()) }
 
-            val req = request("/api/services/$domain/$service", "POST", body)
+            logVerbose("Payload: $rootPayload")
+
+            val body = json.encodeToString(JsonObject.serializer(), JsonObject(rootPayload))
+
+            val req = request("/api/services/$domain/$service", body)
             logVerbose("url: ${req.url}")
 
             try {
-                val response = http.newCall(req).execute()
-
-                result = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, result)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    false
-                } else {
-                    homeAssistantStatus = HomeassistantStatus.CONNECTED
-                    true
+                http.newCall(req).execute().use { response ->
+                    result = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, result)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        false
+                    } else {
+                        homeAssistantStatus = HomeassistantStatus.CONNECTED
+                        true
+                    }
                 }
             } catch (e: IOException) {
                 error = formatException(e)
@@ -274,23 +317,23 @@ class HomeAssistantClient(
 
 
             val body = json.encodeToString(
-                MapSerializer(String.Companion.serializer(), JsonElement.Companion.serializer()),
+                MapSerializer(String.serializer(), JsonElement.serializer()),
                 payload.mapValues { JsonPrimitive(it.value.toString()) }
             )
 
-            val req = request("/api/events/$eventType", "POST", body)
+            val req = request("/api/events/$eventType", body)
             logVerbose("url: ${req.url}")
             try {
-                val response = http.newCall(req).execute()
-
-                result = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    error = formatHttpError(response, result)
-                    homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
-                    false
-                } else {
-                    homeAssistantStatus = HomeassistantStatus.CONNECTED
-                    true
+                http.newCall(req).execute().use { response ->
+                    result = response.body?.string() ?: ""
+                    if (!response.isSuccessful) {
+                        error = formatHttpError(response, result)
+                        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+                        false
+                    } else {
+                        homeAssistantStatus = HomeassistantStatus.CONNECTED
+                        true
+                    }
                 }
             } catch (e: IOException) {
                 error = formatException(e)
@@ -301,7 +344,19 @@ class HomeAssistantClient(
 
     // --- Conversions
     private fun convertService(haService: HaService, serviceId: String, domain: String): ActualService {
-        val hasEntityTarget = haService.target?.containsKey("entity") ?: false
+        var hasEntityTarget = haService.target?.containsKey("entity") ?: false
+        if(haService.target?.isEmpty() ?: false){
+            // This means the target can be entity,device, areas and labels. So allow entity
+            hasEntityTarget = true
+        }
+
+        val broadTarget = haService.target?.isEmpty() ?: false
+        
+        // Extract domain filter from target.entity[].domain[]
+        val targetDomain = extractTargetDomain(haService.target, domain)
+
+        val hasTargetDefinition = haService.target != null
+
         val actualService = ActualService(
             id = serviceId,
             name = haService.name,
@@ -309,7 +364,9 @@ class HomeAssistantClient(
             type = domain,
             domain = domain,
             fields = mutableListOf(),
-            targetEntity = hasEntityTarget
+            targetEntity = hasEntityTarget,
+            broadEntityTarget = broadTarget,
+            hasTargetDefinition = hasTargetDefinition
         )
 
 
@@ -317,7 +374,48 @@ class HomeAssistantClient(
             if (id != "advanced_fields") convertField(fieldData, id)?.let { actualService.fields += it }
         }
 
+        // Inject synthetic entity_id field for services with entity targets
+        // Skip if an explicit entity_id field already exists (HACS services)
+        if (hasEntityTarget && actualService.fields.none { it.id == "entity_id" }) {
+            val syntheticEntityField = HaServiceField(
+                id = "entity_id",
+                name = "Entities",
+                description = "Target entity for this service",
+                required = true,
+                type = HaServiceFieldType.STATE,
+                multipleEntities = true,
+                domain = targetDomain
+            )
+            actualService.fields.add(0, syntheticEntityField)  // Prepend to top
+        } else if (hasEntityTarget) {
+            // If explicit entity_id field exists, always allow multiple and set domain
+            actualService.fields.find { it.id == "entity_id" }?.let { field ->
+                field.multipleEntities = true
+                field.domain = targetDomain
+                if (field.name.isNullOrBlank()) {
+                    field.name = "Entities"
+                }
+            }
+        }
+
         return actualService
+    }
+    
+    private fun extractTargetDomain(target: Map<String, JsonElement>?, serviceDomain: String): String? {
+        try {
+            // Parse target.entity[].domain[] structure
+            val entityArray = target?.get("entity")?.jsonArray ?: return if (target?.isEmpty() == false) serviceDomain else null
+            if (entityArray.isEmpty()) return null
+            
+            val firstEntity = entityArray.firstOrNull()?.jsonObject ?: return null
+            val domainArray = firstEntity["domain"]?.jsonArray ?: return null
+            val domainStr = domainArray.firstOrNull()?.jsonPrimitive?.contentOrNull
+            
+            return domainStr
+        } catch (e: Exception) {
+            // If parsing fails, default to service domain if not broad target
+            return null
+        }
     }
 
     private fun convertField(field: Map<String, JsonElement>, id: String): HaServiceField? {
@@ -330,7 +428,6 @@ class HomeAssistantClient(
                 is JsonPrimitive -> fieldData.example = element.contentOrNull
                 is JsonArray -> fieldData.example = element.joinToString(", ") { it.toString() }
                 is JsonObject -> fieldData.example = element.toString()
-                else -> fieldData.example = null
             }
         }
 
@@ -338,6 +435,14 @@ class HomeAssistantClient(
             "date" -> fieldData.type = HaServiceFieldType.DATE
             "time" -> fieldData.type = HaServiceFieldType.TIME
             "datetime" -> fieldData.type = HaServiceFieldType.DATETIME
+        }
+
+        // Special handling for entity_id fields (common in PyScript services)
+        // Use STATE type to indicate this is an entity reference
+        if (id == "entity_id" || id.startsWith("entity_id_")) {
+            if (fieldData.type == null) {
+                fieldData.type = HaServiceFieldType.STATE
+            }
         }
 
         if (fieldData.type == null) {
@@ -388,10 +493,14 @@ class HomeAssistantClient(
                     }
                 }
             }
-
-
         }
 
-        return fieldData.type?.let { fieldData }
+        // Default to TEXT for any field without a determined type (e.g., PyScript services)
+        // This ensures fields are always shown, even if Home Assistant doesn't provide type info
+        if (fieldData.type == null) {
+            fieldData.type = HaServiceFieldType.TEXT
+        }
+
+        return fieldData
     }
 }

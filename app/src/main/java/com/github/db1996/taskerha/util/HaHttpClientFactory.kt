@@ -7,6 +7,7 @@ import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.logging.LogChannel
 import okhttp3.OkHttpClient
 import java.net.Socket
+import java.util.concurrent.TimeUnit
 import java.security.KeyStore
 import java.security.Principal
 import java.security.PrivateKey
@@ -35,7 +36,11 @@ object HaHttpClientFactory {
         clientCertAlias: String = HaSettings.loadClientCertAlias(context),
         configure: (OkHttpClient.Builder) -> Unit = {}
     ): OkHttpClient {
+        val timeoutSeconds = HaSettings.loadRequestTimeout(context).toLong()
         val builder = OkHttpClient.Builder()
+            .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
         configure(builder)
 
         if (clientCertEnabled) {

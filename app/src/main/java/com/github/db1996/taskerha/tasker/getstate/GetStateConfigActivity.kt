@@ -2,6 +2,7 @@ package com.github.db1996.taskerha.tasker.getstate
 
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigActivity
 import com.github.db1996.taskerha.tasker.getstate.data.HaGetStateBuiltForm
 import com.github.db1996.taskerha.tasker.getstate.data.HaGetStateForm
@@ -18,24 +19,34 @@ class GetStateConfigActivity : BaseTaskerConfigActivity<
 >() {
 
     override val viewModel: HaGetStateViewModel by viewModels { createViewModelFactory() }
+    
+    // Track if this is a new action (no instanceId in input)
+    private var isNewAction = false
 
     override fun createViewModelFactory() = HaGetStateViewModelFactory(this)
 
     override fun createHelper() = HaGetStateConfigHelper(this)
 
     override fun createScreen(onSave: (HaGetStateBuiltForm) -> Unit): @Composable () -> Unit = {
-        HaGetStateScreen(viewModel, onSave)
+        HaGetStateScreen(viewModel, onSave, isNewAction)
     }
 
     override fun convertBuiltFormToInput(builtForm: HaGetStateBuiltForm): HaGetStateInput {
         return HaGetStateInput().apply {
             entityId = builtForm.entityId
+            instanceId = builtForm.instanceId
         }
     }
 
     override fun convertInputToBuiltForm(input: HaGetStateInput): HaGetStateBuiltForm {
+        // Track if this is a new action (no instanceId yet)
+        isNewAction = input.instanceId.isBlank()
+        
         return HaGetStateBuiltForm(
             entityId = input.entityId,
+            instanceId = input.instanceId.ifBlank { 
+                HaInstanceRepository.getActive()?.id ?: HaInstanceRepository.getDefault()?.id ?: "" 
+            },
             blurb = "Get state: ${input.entityId}"
         )
     }

@@ -1,5 +1,6 @@
 package com.github.db1996.taskerha.activities.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.util.PrefsJsonStore
@@ -108,32 +111,50 @@ private fun TriggerCard(
     onDelete: () -> Unit
 ) {
     var showConfirm by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
 
     val hasId = form.triggerId != null
     val entityLabel = when {
-        form.entityIds.isNotEmpty() -> form.entityIds.joinToString(", ")
+        form.entityIds.isNotEmpty() -> form.entityIds.first()
         form.entityId.isNotBlank() -> form.entityId
         else -> "(any entity)"
+    }
+    val instanceName = remember(form.instanceId) {
+        HaInstanceRepository.getById(form.instanceId)
+            ?.name?.takeIf { it.isNotBlank() }
+            ?: form.instanceId.takeIf { it.isNotBlank() }
     }
 
     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            // Header row: entity label + instance chip + delete
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
+                Row(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(entityLabel, style = MaterialTheme.typography.titleSmall)
-                    if (form.fromState.isNotBlank()) DataRow("From", form.fromState)
-                    if (form.toState.isNotBlank()) DataRow("To", form.toState)
-                    if (form.forDuration.isNotBlank()) DataRow("For", form.forDuration)
+                    if (instanceName != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = MaterialTheme.shapes.small
+                        ) {
+                            Text(
+                                instanceName,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
                 }
                 IconButton(onClick = { showConfirm = true }) {
                     Icon(
@@ -146,6 +167,7 @@ private fun TriggerCard(
 
             HorizontalDivider()
 
+            // Footer: old-version warning / trigger ID + view details link
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -170,13 +192,71 @@ private fun TriggerCard(
                         )
                     }
                 } else {
-                    Spacer(Modifier.weight(1f))
+                    Text(
+                        form.triggerId ?: "no id",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                Text(
-                    form.triggerId ?: "no id",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 4.dp, vertical = 0.dp
+                    )
+                ) {
+                    Text(
+                        if (expanded) "Hide details" else "View details →",
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+
+            // Expandable detail section
+            AnimatedVisibility(visible = expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    HorizontalDivider()
+                    if (form.entityIds.size > 1) {
+                        Text(
+                            form.entityIds.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (form.configPerEntity && form.entityConfigs.isNotEmpty()) {
+                        form.entityConfigs.forEach { cfg ->
+                            Column(
+                                modifier = Modifier.padding(start = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(cfg.entityId, style = MaterialTheme.typography.labelSmall)
+                                if (cfg.targetAttribute.isNotBlank()) DataRow("Attribute", cfg.targetAttribute)
+                                if (cfg.fromState.isNotBlank()) DataRow("From", cfg.fromState)
+                                if (cfg.toState.isNotBlank()) DataRow("To", cfg.toState)
+                                if (cfg.forDuration.isNotBlank()) DataRow("For", cfg.forDuration)
+                            }
+                        }
+                    } else {
+                        // v0 legacy: top-level fromState/toState/forDuration
+                        // v1+: sharedConfig holds the data (top-level fields are empty)
+                        val effectiveFrom = form.sharedConfig.fromState.ifBlank { form.fromState }
+                        val effectiveTo = form.sharedConfig.toState.ifBlank { form.toState }
+                        val effectiveFor = form.sharedConfig.forDuration.ifBlank { form.forDuration }
+                        val effectiveAttr = form.sharedConfig.targetAttribute
+                        if (effectiveAttr.isNotBlank()) DataRow("Attribute", effectiveAttr)
+                        if (effectiveFrom.isNotBlank()) DataRow("From", effectiveFrom)
+                        if (effectiveTo.isNotBlank()) DataRow("To", effectiveTo)
+                        if (effectiveFor.isNotBlank()) DataRow("For", effectiveFor)
+                        if (effectiveAttr.isBlank() && effectiveFrom.isBlank() &&
+                            effectiveTo.isBlank() && effectiveFor.isBlank()) {
+                            Text(
+                                "No conditions — triggers on any state change",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }

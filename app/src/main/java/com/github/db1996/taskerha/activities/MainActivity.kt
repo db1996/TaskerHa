@@ -1,5 +1,7 @@
 package com.github.db1996.taskerha.activities
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,8 +16,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import com.github.db1996.taskerha.activities.screens.MainSettingsScreen
 import com.github.db1996.taskerha.ui.theme.TaskerHaTheme
+import com.github.db1996.taskerha.util.PingManager
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,17 +28,28 @@ class MainActivity : ComponentActivity() {
 
         enableEdgeToEdge()
 
+        val incomingUri = intent
+            .takeIf { it.action == Intent.ACTION_VIEW }
+            ?.data
+
         setContent {
             TaskerHaTheme {
-                MainScreen()
+                MainScreen(incomingBackupUri = incomingUri)
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch {
+            PingManager.ping(this@MainActivity)
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
+fun MainScreen(incomingBackupUri: Uri? = null) {
     var topBarContent by remember { mutableStateOf<@Composable () -> Unit>({}) }
 
     Scaffold(
@@ -42,7 +58,8 @@ fun MainScreen() {
     ) { padding ->
         MainSettingsScreen(
             modifier = Modifier.padding(padding),
-            setTopBar = {  topBarContent = it }
+            setTopBar = { topBarContent = it },
+            incomingBackupUri = incomingBackupUri
         )
     }
 }

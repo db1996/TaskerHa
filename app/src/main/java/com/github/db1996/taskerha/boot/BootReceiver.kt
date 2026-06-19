@@ -15,9 +15,10 @@ class BootReceiver : BroadcastReceiver() {
     
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
+            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
 
-        CustomLogger.v(TAG, "BOOT_COMPLETED received")
+        CustomLogger.v(TAG, "${intent.action} received")
 
         val wsEnabled = HaSettings.loadWebSocketEnabled(context)
         if (!wsEnabled) {

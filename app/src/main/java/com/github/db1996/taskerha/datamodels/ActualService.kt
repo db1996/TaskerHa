@@ -7,5 +7,9 @@ data class ActualService(
     val type: String,
     val domain: String,
     val fields: MutableList<HaServiceField>,
-    val targetEntity: Boolean
+    @Deprecated("Migrated to synthetic entity_id field")
+    val targetEntity: Boolean,
+    @Deprecated("Migrated to multipleEntities property on entity_id field")
+    val broadEntityTarget: Boolean = false,
+    val hasTargetDefinition: Boolean = false
 )
