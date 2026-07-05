@@ -104,6 +104,15 @@ fun FieldInput(
                 )
             }
 
+            HaServiceFieldType.OBJECT -> {
+                FieldObjectInput(
+                    field = field,
+                    state = state,
+                    onValueChange = onValueChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
             else -> {
                 FieldTextInput(
                     field = field,
@@ -131,6 +140,23 @@ fun FieldTextInput(
     )
 }
 
+
+@Composable
+fun FieldObjectInput(
+    field: HaServiceField,
+    state: FieldState,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextField(
+        value = state.value.value,
+        onValueChange = onValueChange,
+        label = { Text("${field.name ?: field.id} (YAML)") },
+        placeholder = { Text("key: value\nother_key: true") },
+        minLines = 3,
+        modifier = modifier
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

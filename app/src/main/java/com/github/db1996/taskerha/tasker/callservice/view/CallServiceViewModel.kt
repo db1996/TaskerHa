@@ -17,7 +17,9 @@ import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
 import com.github.db1996.taskerha.tasker.callservice.data.FieldState
+import com.github.db1996.taskerha.enums.HaServiceFieldType
 import com.github.db1996.taskerha.util.HaHttpClientFactory
+import com.github.db1996.taskerha.util.YamlJsonConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -108,6 +110,26 @@ class CallServiceViewModel(
 
     }
 
+    // Fields backed by an "object" selector are edited as YAML; convert them to JSON
+    // text here so HomeAssistantClient.callService can embed them as nested objects.
+    private fun convertObjectFields(data: Map<String, String>): Map<String, String> {
+        val objectFieldIds = selectedService?.fields
+            ?.filter { it.type == HaServiceFieldType.OBJECT }
+            ?.map { it.id }
+            ?.toSet()
+            ?: return data
+
+        if (objectFieldIds.isEmpty()) return data
+
+        return data.mapValues { (key, value) ->
+            if (key in objectFieldIds) {
+                YamlJsonConverter.yamlToJsonString(value) ?: value
+            } else {
+                value
+            }
+        }
+    }
+
     private fun ensureTargetKeys() {
         for (key in listOf("device_id", "area_id", "label_id")) {
             if (!form.dataContainer.containsKey(key)) {
@@ -144,11 +166,13 @@ class CallServiceViewModel(
         val service = form.service
 
         val targetKeys = setOf("entity_id", "device_id", "area_id", "label_id")
-        val data = form.dataContainer
-            .filter { (key, state) ->
-                state.toggle.value || (key in targetKeys && state.value.value.isNotBlank())
-            }
-            .mapValues { it.value.value.value }
+        val data = convertObjectFields(
+            form.dataContainer
+                .filter { (key, state) ->
+                    state.toggle.value || (key in targetKeys && state.value.value.isNotBlank())
+                }
+                .mapValues { it.value.value.value }
+        )
 
         // For backward compatibility, populate legacy entityId field from dataContainer["entity_id"]
         val entityIdValue = data.getOrDefault("entity_id", "")
@@ -245,9 +269,11 @@ class CallServiceViewModel(
         val service = form.service
         val entityId = form.entityId
         logDebug("Testing call service: $domain, $service, $entityId")
-        val data = form.dataContainer
-            .filter { it.value.toggle.value }
-            .mapValues { it.value.value.value }
+        val data = convertObjectFields(
+            form.dataContainer
+                .filter { it.value.toggle.value }
+                .mapValues { it.value.value.value }
+        )
 
         launchClientOperation { client ->
             val targetKeys = setOf("entity_id", "device_id", "area_id", "label_id")

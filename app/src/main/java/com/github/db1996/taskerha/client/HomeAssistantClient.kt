@@ -25,6 +25,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.parseToJsonElement
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -278,7 +279,7 @@ class HomeAssistantClient(
                 rootPayload["entity_id"] = JsonPrimitive(entityId)
             }
 
-            data?.forEach { (key, value) -> rootPayload[key] = JsonPrimitive(value.toString()) }
+            data?.forEach { (key, value) -> rootPayload[key] = toDataJsonElement(value) }
 
             logVerbose("Payload: $rootPayload")
 
@@ -343,6 +344,19 @@ class HomeAssistantClient(
         }
 
     // --- Conversions
+    // Data field values are stored as plain strings, but a field backed by an "object"
+    // selector may contain JSON text (converted from user-entered YAML). Embed it as a
+    // nested structure instead of sending it as an escaped JSON string.
+    private fun toDataJsonElement(value: Any): JsonElement {
+        val stringValue = value.toString()
+        val parsed = try {
+            json.parseToJsonElement(stringValue)
+        } catch (_: Exception) {
+            null
+        }
+        return if (parsed is JsonObject || parsed is JsonArray) parsed else JsonPrimitive(stringValue)
+    }
+
     private fun convertService(haService: HaService, serviceId: String, domain: String): ActualService {
         var hasEntityTarget = haService.target?.containsKey("entity") ?: false
         if(haService.target?.isEmpty() ?: false){
@@ -449,8 +463,12 @@ class HomeAssistantClient(
             val selector = field["selector"]?.jsonObject
             selector?.let { sel ->
                 HaServiceFieldType.entries.forEach { t ->
-                    val selectorElement = sel[t.name.lowercase()] ?: return@forEach
-                    val obj = (selectorElement as? JsonObject) ?: return@forEach
+                    if (fieldData.type != null) return@forEach
+                    // Selector values are often `null` (e.g. "text": null, "object": null),
+                    // so only require the key to be present, not that its value is an object.
+                    if (!sel.containsKey(t.name.lowercase())) return@forEach
+                    val obj = sel[t.name.lowercase()] as? JsonObject
+
                     when (t) {
                         HaServiceFieldType.TEXT -> {
                             fieldData.type = HaServiceFieldType.TEXT
@@ -460,9 +478,13 @@ class HomeAssistantClient(
                             fieldData.type = HaServiceFieldType.BOOLEAN
                         }
 
+                        HaServiceFieldType.OBJECT -> {
+                            fieldData.type = HaServiceFieldType.OBJECT
+                        }
+
                         HaServiceFieldType.SELECT -> {
                             fieldData.type = HaServiceFieldType.SELECT
-                            val optionsArray = obj["options"]?.jsonArray ?: JsonArray(emptyList())
+                            val optionsArray = obj?.get("options")?.jsonArray ?: JsonArray(emptyList())
                             fieldData.options = optionsArray.map { item ->
                                 if (item is JsonPrimitive) {
                                     Option(item.content, item.content)
@@ -482,11 +504,11 @@ class HomeAssistantClient(
 
                         HaServiceFieldType.NUMBER -> {
                             fieldData.type = HaServiceFieldType.NUMBER
-                            fieldData.min = obj["min"]?.jsonPrimitive?.doubleOrNull
-                            fieldData.max = obj["max"]?.jsonPrimitive?.doubleOrNull
+                            fieldData.min = obj?.get("min")?.jsonPrimitive?.doubleOrNull
+                            fieldData.max = obj?.get("max")?.jsonPrimitive?.doubleOrNull
                             fieldData.unit_of_measurement =
-                                obj["unit"]?.jsonPrimitive?.contentOrNull
-                                    ?: obj["unit_of_measurement"]?.jsonPrimitive?.contentOrNull
+                                obj?.get("unit")?.jsonPrimitive?.contentOrNull
+                                    ?: obj?.get("unit_of_measurement")?.jsonPrimitive?.contentOrNull
                         }
 
                         else -> fieldData.type = HaServiceFieldType.TEXT
