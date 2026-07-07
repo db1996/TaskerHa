@@ -1,0 +1,1 @@
+- Fixed issue with installed CA certificates not working correctly. Fixed by having a network security document
