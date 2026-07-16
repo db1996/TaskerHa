@@ -318,6 +318,7 @@ class CallServiceViewModel(
                             if (success) {
                                 services = newClient.getServicesFront()
                                 entities = newClient.getEntities()
+                                client = newClient
                                 clientError = ""
                                 logDebug("Loaded ${services.size} services and ${entities.size} entities from instance: ${instance.name}")
                             } else {
