@@ -250,6 +250,7 @@ class OnTriggerStateViewModel(
                             val success = newClient.ping()
                             if (success) {
                                 entities = newClient.getEntities()
+                                client = newClient
                                 clientError = ""
                                 logDebug("Loaded ${entities.size} entities from instance: ${instance.name}")
                             } else {

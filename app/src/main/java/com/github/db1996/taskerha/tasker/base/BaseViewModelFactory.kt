@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import kotlinx.coroutines.CoroutineScope
@@ -70,9 +71,17 @@ abstract class ClientViewModelFactory<VM : ViewModel>(
 ) : BaseViewModelFactory<VM>() {
 
     protected val client: HomeAssistantClient by lazy {
-        val url = HaSettings.loadUrl(context)
-        val token = HaSettings.loadToken(context)
-        HomeAssistantClient(url, token, HaHttpClientFactory.build(context)).also {
+        val instance = HaInstanceRepository.getActive()
+        val url = instance?.resolveUrl() ?: HaSettings.loadUrl(context)
+        val token = instance?.token ?: HaSettings.loadToken(context)
+        val httpClient = HaHttpClientFactory.build(
+            context,
+            clientCertEnabled = instance?.clientCertEnabled
+                ?: HaSettings.loadClientCertEnabled(context),
+            clientCertAlias = instance?.clientCertAlias
+                ?: HaSettings.loadClientCertAlias(context)
+        )
+        HomeAssistantClient(url, token, httpClient).also {
             CoroutineScope(Dispatchers.IO).launch {
                 val success = it.ping()
                 if (!success) {
