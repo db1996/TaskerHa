@@ -218,19 +218,40 @@ data class HaInstance(
     val hacsChecked: Boolean = false
 ) {
     /**
-     * Resolves the appropriate URL based on current network context.
+     * Ordered list of endpoints to try, first to last. Never empty.
+     *
+     * The remote endpoint goes first: the local one exists as an offline fallback,
+     * not as the fast path. The SSID gate is kept as a precondition — without a
+     * matching SSID the local URL is never attempted at all, otherwise on an
+     * arbitrary network we would send the access token to whatever host happens to
+     * answer at a private address.
+     *
+     * The SSID is not an authenticator and this ordering is not a security boundary;
+     * see docs/superpowers/specs/2026-08-25-url-fallback-sicurezza-design.md
+     *
+     * Both parameters default to live state so production callers are unaffected;
+     * tests pass them explicitly to keep this function pure.
      */
-    fun resolveUrl(): String {
-        if (localUrl.isBlank()) return remoteUrl
-        if (homeSsids.isEmpty()) return remoteUrl
+    fun resolveUrlCandidates(
+        currentSsid: String? = com.github.db1996.taskerha.util.NetworkHelper.getCurrentSsid(),
+        latchedUrl: String? = com.github.db1996.taskerha.util.LanLatch.armedUrlFor(currentSsid)
+    ): List<String> {
+        if (localUrl.isBlank()) return listOf(remoteUrl)
+        if (homeSsids.isEmpty()) return listOf(remoteUrl)
+        if (currentSsid == null || !homeSsids.contains(currentSsid)) return listOf(remoteUrl)
 
-        val currentSsid = com.github.db1996.taskerha.util.NetworkHelper.getCurrentSsid()
-        if (currentSsid != null && homeSsids.contains(currentSsid)) {
-            return localUrl
+        return if (latchedUrl == localUrl) {
+            listOf(localUrl, remoteUrl)
+        } else {
+            listOf(remoteUrl, localUrl)
         }
-
-        return remoteUrl
     }
+
+    /**
+     * The endpoint to start from. Kept for the call sites that only need one URL;
+     * the fallback chain lives in [resolveUrlCandidates].
+     */
+    fun resolveUrl(): String = resolveUrlCandidates().first()
 
     companion object {
         /**
