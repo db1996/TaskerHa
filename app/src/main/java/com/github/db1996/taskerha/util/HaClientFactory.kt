@@ -14,16 +14,19 @@ import com.github.db1996.taskerha.datamodels.HaInstance
 object HaClientFactory {
 
     fun forInstance(context: Context, instance: HaInstance): HomeAssistantClient {
-        val candidates = instance.resolveUrlCandidates()
         return HomeAssistantClient(
-            baseUrl = candidates.first(),
+            baseUrl = instance.resolveUrlCandidates().first(),
             accessToken = instance.token,
             httpClient = HaHttpClientFactory.build(
                 context,
                 clientCertEnabled = instance.clientCertEnabled,
                 clientCertAlias = instance.clientCertAlias
             ),
-            urlCandidates = candidates,
+            // Re-resolved on every ping, never snapshotted: the client outlives the
+            // network it was built on, and the SSID gate that decides whether the
+            // local endpoint is eligible at all has to be evaluated against the
+            // network in use now, not the one in use at construction time.
+            candidateProvider = { instance.resolveUrlCandidates() },
             onEndpointSelected = { selected ->
                 noteSelected(instance, selected, NetworkHelper.getCurrentSsid())
             }

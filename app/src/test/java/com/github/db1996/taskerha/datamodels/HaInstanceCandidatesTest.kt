@@ -80,6 +80,23 @@ class HaInstanceCandidatesTest {
     }
 
     @Test
+    fun `a blank remote url leaves the local one as the only candidate`() {
+        val local = instance(remoteUrl = "")
+        val candidates = local.resolveUrlCandidates(currentSsid = "CasaMia", latchedUrl = null)
+        assertEquals(listOf("http://192.168.1.50:8123"), candidates)
+        assertEquals("http://192.168.1.50:8123", local.resolveUrl(
+            currentSsid = "CasaMia",
+            latchedUrl = null
+        ))
+    }
+
+    @Test
+    fun `an entirely unconfigured instance still yields a non-empty list`() {
+        val empty = instance(remoteUrl = "", localUrl = "", homeSsids = emptySet())
+        assertEquals(listOf(""), empty.resolveUrlCandidates(currentSsid = null, latchedUrl = null))
+    }
+
+    @Test
     fun `resolveUrl returns the first candidate`() {
         assertEquals(
             "https://ha.example.com",

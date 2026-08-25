@@ -38,7 +38,7 @@ class HomeAssistantClientPingTest {
         val client = HomeAssistantClient(
             baseUrl = url(first),
             accessToken = "tok",
-            urlCandidates = listOf(url(first), url(second)),
+            candidateProvider = { listOf(url(first), url(second)) },
             onEndpointSelected = { selected.add(it) }
         )
 
@@ -59,7 +59,7 @@ class HomeAssistantClientPingTest {
         val client = HomeAssistantClient(
             baseUrl = url(first),
             accessToken = "tok",
-            urlCandidates = listOf(url(first), url(second)),
+            candidateProvider = { listOf(url(first), url(second)) },
             onEndpointSelected = { selected.add(it) }
         )
 
@@ -69,6 +69,38 @@ class HomeAssistantClientPingTest {
         assertEquals(url(second), client.baseUrl)
         assertEquals(listOf(url(second)), selected)
         assertEquals(HomeassistantStatus.CONNECTED, client.homeAssistantStatus)
+        // The first candidate's failure must not be left behind: BaseViewModel treats
+        // a non-empty error as a broken connection even after a successful ping.
+        assertEquals("", client.error)
+    }
+
+    @Test
+    fun `asks the provider again on every ping so a changed list takes effect`() {
+        first.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        second.enqueue(MockResponse().setResponseCode(200).setBody("{}"))
+        var invocations = 0
+        var candidates = listOf(url(first))
+        val client = HomeAssistantClient(
+            baseUrl = url(first),
+            accessToken = "tok",
+            candidateProvider = {
+                invocations++
+                candidates
+            }
+        )
+
+        assertTrue(runBlocking { client.ping() })
+        assertEquals(1, invocations)
+        assertEquals(url(first), client.baseUrl)
+
+        // Same client, different network: the provider now offers a different endpoint.
+        candidates = listOf(url(second))
+
+        assertTrue(runBlocking { client.ping() })
+        assertEquals(2, invocations)
+        assertEquals(url(second), client.baseUrl)
+        assertEquals(1, first.requestCount)
+        assertEquals(1, second.requestCount)
     }
 
     @Test
@@ -79,7 +111,7 @@ class HomeAssistantClientPingTest {
         val client = HomeAssistantClient(
             baseUrl = url(first),
             accessToken = "tok",
-            urlCandidates = listOf(url(first), url(second)),
+            candidateProvider = { listOf(url(first), url(second)) },
             onEndpointSelected = { selected.add(it) }
         )
 
