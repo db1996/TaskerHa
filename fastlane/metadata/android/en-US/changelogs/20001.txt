@@ -1,0 +1,1 @@
+- fixed an issue with object based parameters

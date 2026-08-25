@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
  */
 abstract class BaseViewModel<F : Any, B : Any>(
     initialForm: F,
-    protected val client: HomeAssistantClient? = null
+    protected var client: HomeAssistantClient? = null
 ) : ViewModel(), BaseLogger {
 
     var form by mutableStateOf(initialForm)
@@ -101,6 +101,7 @@ abstract class BaseViewModel<F : Any, B : Any>(
      * @return true if ping succeeded, false otherwise
      */
     protected suspend fun ensureClientReady(): Boolean {
+        val client = this.client
         if (client == null) {
             clientError = "No HomeAssistant client configured"
             logError(clientError)

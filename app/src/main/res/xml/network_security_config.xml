@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Home Assistant instances are frequently reached via self-signed certs or
+    certs issued by an internal/private CA that the user has installed as a
+    user-trusted certificate on their device. Android's default trust config
+    (API 24+) only trusts system CAs, so without this file those connections
+    fail with "Trust anchor for certification path not found" even though the
+    cert is trusted by the device.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
