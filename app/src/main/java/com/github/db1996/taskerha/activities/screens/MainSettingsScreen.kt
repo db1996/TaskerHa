@@ -68,6 +68,7 @@ import com.github.db1996.taskerha.service.WsConnectionState
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import com.github.db1996.taskerha.util.NetworkHelper
 import com.github.db1996.taskerha.util.PingManager
+import com.github.db1996.taskerha.util.UrlSecurity
 import com.github.db1996.taskerha.util.hasNotificationPermission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -760,6 +761,8 @@ private fun InstanceEditorDialog(
                     singleLine = true
                 )
 
+                CleartextUrlWarning(url = remoteUrl, isRemote = true)
+
                 OutlinedTextField(
                     value = token,
                     onValueChange = { token = it },
@@ -1047,10 +1050,12 @@ private fun LocalUrlSection(
         value = localUrl,
         onValueChange = onLocalUrlChange,
         label = { Text("Local Home Assistant URL") },
-        placeholder = { Text("http://192.168.1.x:8123") },
+        placeholder = { Text("https://192.168.1.x:8123") },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
     )
+
+    CleartextUrlWarning(url = localUrl, isRemote = false)
 
     Spacer(Modifier.height(8.dp))
 
@@ -1888,4 +1893,32 @@ fun openAppBatterySettings(context: Context) {
         data = "package:${context.packageName}".toUri()
     }
     context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+@Composable
+private fun CleartextUrlWarning(url: String, isRemote: Boolean) {
+    if (!UrlSecurity.isCleartext(url)) return
+
+    val where = if (isRemote) "the internet" else "the local network"
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Warning,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = "Not encrypted. Traffic and your access token travel in cleartext " +
+                "over $where, and anyone able to listen can capture them. " +
+                "Use https:// if you can.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
+        )
+    }
 }
