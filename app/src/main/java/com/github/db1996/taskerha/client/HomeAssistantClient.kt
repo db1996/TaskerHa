@@ -37,7 +37,17 @@ import javax.net.ssl.SSLHandshakeException
 class HomeAssistantClient(
     var baseUrl: String = "",
     var accessToken: String = "",
-    httpClient: OkHttpClient = OkHttpClient()
+    httpClient: OkHttpClient = OkHttpClient(),
+    /**
+     * Endpoints to try in order during [ping]. Empty means "just use [baseUrl]",
+     * which is what every legacy call site does.
+     */
+    private val urlCandidates: List<String> = emptyList(),
+    /**
+     * Invoked with the endpoint [ping] settled on. Lets the caller record which
+     * endpoint won without giving this client any knowledge of network policy.
+     */
+    private val onEndpointSelected: (String) -> Unit = {}
 ): BaseLogger {
 
     override val logTag: String
@@ -121,8 +131,33 @@ class HomeAssistantClient(
     }
 
     // --- API calls
+    /**
+     * Tries each candidate in order and settles [baseUrl] on the first that answers.
+     * Every other method is gated on [homeAssistantStatus] == CONNECTED and all
+     * callers ping before use, so the endpoint is decided once per session here
+     * rather than on every request.
+     */
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
-        try {
+        val candidates = urlCandidates.ifEmpty { listOf(baseUrl) }
+        var lastError = ""
+
+        for (candidate in candidates) {
+            baseUrl = candidate
+            if (pingOnce()) {
+                onEndpointSelected(candidate)
+                return@withContext true
+            }
+            lastError = error
+        }
+
+        baseUrl = candidates.first()
+        error = lastError
+        homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+        false
+    }
+
+    private fun pingOnce(): Boolean {
+        return try {
             http.newCall(request("/api/")).execute().use { response ->
                 logVerbose("Ping url ${response.request.url}")
                 if (!response.isSuccessful) {
