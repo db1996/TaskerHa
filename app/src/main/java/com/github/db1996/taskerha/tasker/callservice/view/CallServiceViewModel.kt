@@ -18,6 +18,7 @@ import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltFo
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
 import com.github.db1996.taskerha.tasker.callservice.data.FieldState
 import com.github.db1996.taskerha.enums.HaServiceFieldType
+import com.github.db1996.taskerha.enums.HomeassistantStatus
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import com.github.db1996.taskerha.util.YamlJsonConverter
 import kotlinx.coroutines.Dispatchers
@@ -163,7 +164,19 @@ class CallServiceViewModel(
         viewModelScope.launch {
             registryLoading = true
             try {
-                val data = withContext(Dispatchers.IO) { client?.getRegistryData() }
+                val data = withContext(Dispatchers.IO) {
+                    val c = client ?: return@withContext null
+                    // getRegistryData() short-circuits to null unless the client has
+                    // already been pinged. When editing an existing action nothing calls
+                    // changeInstance(), so the only ping is the detached one fired by
+                    // ClientViewModelFactory and it may not have completed yet. Ping
+                    // best-effort here; we deliberately ignore the result and never touch
+                    // clientError, so this stays non-fatal (see the KDoc above).
+                    if (c.homeAssistantStatus != HomeassistantStatus.CONNECTED) {
+                        c.ping()
+                    }
+                    c.getRegistryData()
+                }
                 if (data != null) registryData = data
             } catch (e: Exception) {
                 logError("Optional registry data load failed (ignored): ${e.message}")
