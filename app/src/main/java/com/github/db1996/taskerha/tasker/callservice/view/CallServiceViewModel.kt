@@ -19,7 +19,7 @@ import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
 import com.github.db1996.taskerha.tasker.callservice.data.FieldState
 import com.github.db1996.taskerha.enums.HaServiceFieldType
 import com.github.db1996.taskerha.enums.HomeassistantStatus
-import com.github.db1996.taskerha.util.HaHttpClientFactory
+import com.github.db1996.taskerha.util.HaClientFactory
 import com.github.db1996.taskerha.util.YamlJsonConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -370,15 +370,7 @@ class CallServiceViewModel(
 
     fun retryLoad() = changeInstance(form.instanceId)
 
-    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
-        val url = instance.resolveUrl()
-        val token = instance.token
-        val httpClient = HaHttpClientFactory.build(
-            context,
-            clientCertEnabled = instance.clientCertEnabled,
-            clientCertAlias = instance.clientCertAlias
-        )
-        return HomeAssistantClient(url, token, httpClient)
-    }
+    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient =
+        HaClientFactory.forInstance(context, instance)
 }
 

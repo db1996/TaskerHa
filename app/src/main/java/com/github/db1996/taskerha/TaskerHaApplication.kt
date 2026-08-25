@@ -9,6 +9,7 @@ import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.logging.CustomLogger
 import com.github.db1996.taskerha.service.HaWebSocketService
 import com.github.db1996.taskerha.util.EntityRecents
+import com.github.db1996.taskerha.util.LanLatch
 import com.github.db1996.taskerha.util.NetworkHelper
 import com.github.db1996.taskerha.util.PingManager
 import com.github.db1996.taskerha.util.PrefsJsonStore
@@ -54,6 +55,9 @@ class TaskerHaApplication : Application() {
         // This is a no-op if location permission has not been granted yet;
         // it will be retried from the Settings screen after the user grants it.
         NetworkHelper.startMonitoring(this)
+
+        // The latch is only valid for the network it was armed on.
+        NetworkHelper.addChangeListener { LanLatch.disarm() }
 
         // Auto-start the WebSocket service if it was enabled and credentials are configured.
         // Covers: app update, process kill/restart, and any case the service isn't running.

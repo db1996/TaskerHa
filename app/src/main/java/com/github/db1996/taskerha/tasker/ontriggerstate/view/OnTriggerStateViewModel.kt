@@ -15,7 +15,7 @@ import com.github.db1996.taskerha.tasker.base.ValidationResult
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.EntityTriggerConfig
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateBuiltForm
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.OnTriggerStateForm
-import com.github.db1996.taskerha.util.HaHttpClientFactory
+import com.github.db1996.taskerha.util.HaClientFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -273,15 +273,7 @@ class OnTriggerStateViewModel(
 
     fun retryLoad() = changeInstance(form.instanceId)
 
-    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
-        val url = instance.resolveUrl()
-        val token = instance.token
-        val httpClient = HaHttpClientFactory.build(
-            context,
-            clientCertEnabled = instance.clientCertEnabled,
-            clientCertAlias = instance.clientCertAlias
-        )
-        return HomeAssistantClient(url, token, httpClient)
-    }
+    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient =
+        HaClientFactory.forInstance(context, instance)
 }
 

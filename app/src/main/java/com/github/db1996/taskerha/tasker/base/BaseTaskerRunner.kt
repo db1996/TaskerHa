@@ -6,6 +6,7 @@ import com.github.db1996.taskerha.datamodels.HaInstance
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.logging.LogChannel
+import com.github.db1996.taskerha.util.HaClientFactory
 import com.github.db1996.taskerha.util.HaHttpClientFactory
 import com.github.db1996.taskerha.tasker.base.ErrorCodes.ERROR_CODE_NETWORK
 import com.github.db1996.taskerha.tasker.base.ErrorCodes.ERROR_CODE_UNKNOWN
@@ -110,16 +111,18 @@ abstract class BaseTaskerRunner<I : Any, O : Any> : TaskerPluginRunnerAction<I, 
             HaInstanceRepository.getDefault()
         }
 
-        // If repository returns null, fall back to legacy HaSettings
-        val url = instance?.resolveUrl() ?: HaSettings.resolveUrl(context)
-        val token = instance?.token ?: HaSettings.loadToken(context)
-        
+        if (instance != null) {
+            return HaClientFactory.forInstance(context, instance)
+        }
+
+        // Legacy fallback: no instance in the repository
+        val url = HaSettings.resolveUrl(context)
+        val token = HaSettings.loadToken(context)
         val httpClient = HaHttpClientFactory.build(
             context,
-            clientCertEnabled = instance?.clientCertEnabled ?: false,
-            clientCertAlias = instance?.clientCertAlias ?: ""
+            clientCertEnabled = false,
+            clientCertAlias = ""
         )
-        
         return HomeAssistantClient(url, token, httpClient)
     }
 
