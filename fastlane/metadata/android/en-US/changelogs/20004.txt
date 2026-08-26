@@ -6,3 +6,7 @@
 - Fixed the log level dropdown, which could never open
 
 Thanks to SimoneAvogadro for the above changes
+
+Changes for issue https://github.com/db1996/TaskerHa/issues/18
+
+- With the Test Connection task, %ha_local and %ha_remote are now properly set
