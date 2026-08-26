@@ -15,8 +15,8 @@ android {
         applicationId = "com.github.db1996.taskerha"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20003
-        versionName = "2.0.3"
+        versionCode = 20004
+        versionName = "2.0.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
