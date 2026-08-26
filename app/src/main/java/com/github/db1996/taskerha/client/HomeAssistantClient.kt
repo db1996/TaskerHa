@@ -11,6 +11,8 @@ import com.github.db1996.taskerha.enums.HaServiceFieldType
 import com.github.db1996.taskerha.enums.HomeassistantStatus
 import com.github.db1996.taskerha.tasker.base.BaseLogger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -35,9 +37,25 @@ import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 
 class HomeAssistantClient(
-    var baseUrl: String = "",
+    @Volatile var baseUrl: String = "",
     var accessToken: String = "",
-    httpClient: OkHttpClient = OkHttpClient()
+    httpClient: OkHttpClient = OkHttpClient(),
+    /**
+     * Supplies the endpoints to try in order, and is invoked afresh at the top of
+     * every [ping] — never snapshotted. The candidate list depends on live network
+     * state (the SSID gate in HaInstance.resolveUrlCandidates), and a client
+     * outlives any single network: a list captured at construction time would let a
+     * roaming device keep offering a LAN endpoint it is no longer on.
+     *
+     * An empty list means "just use [baseUrl]", which is what every legacy call
+     * site does.
+     */
+    private val candidateProvider: () -> List<String> = { emptyList() },
+    /**
+     * Invoked with the endpoint [ping] settled on. Lets the caller record which
+     * endpoint won without giving this client any knowledge of network policy.
+     */
+    private val onEndpointSelected: (String) -> Unit = {}
 ): BaseLogger {
 
     override val logTag: String
@@ -45,6 +63,7 @@ class HomeAssistantClient(
 
     private val http = httpClient
     private val json = Json { ignoreUnknownKeys = true }
+    private val pingMutex = Mutex()
 
     var error: String = ""
     var homeAssistantStatus = HomeassistantStatus.NO_SETTINGS
@@ -121,8 +140,45 @@ class HomeAssistantClient(
     }
 
     // --- API calls
+    /**
+     * Asks [candidateProvider] for a fresh candidate list, tries each candidate in
+     * order and settles [baseUrl] on the first that answers. Every other method is
+     * gated on [homeAssistantStatus] == CONNECTED and all callers ping before use,
+     * so the endpoint stays put between pings rather than being re-decided on every
+     * request.
+     *
+     * Serialised on [pingMutex]: a detached ping (ClientViewModelFactory fires one
+     * at construction) can otherwise overlap with ensureClientReady()'s, and both
+     * loops walk [baseUrl] through the candidates, so an interleaving would send a
+     * request from one to the host chosen by the other.
+     */
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
-        try {
+        pingMutex.withLock {
+            val candidates = candidateProvider().ifEmpty { listOf(baseUrl) }
+            var lastError = ""
+            var connected = false
+
+            for (candidate in candidates) {
+                baseUrl = candidate
+                if (pingOnce()) {
+                    onEndpointSelected(candidate)
+                    connected = true
+                    break
+                }
+                lastError = error
+            }
+
+            if (!connected) {
+                baseUrl = candidates.first()
+                error = lastError
+                homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
+            }
+            connected
+        }
+    }
+
+    private fun pingOnce(): Boolean {
+        return try {
             http.newCall(request("/api/")).execute().use { response ->
                 logVerbose("Ping url ${response.request.url}")
                 if (!response.isSuccessful) {
@@ -131,6 +187,10 @@ class HomeAssistantClient(
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     false
                 } else {
+                    // Clear the error left by a previous candidate's failure: callers
+                    // treat a non-empty error as "the connection is broken" even when
+                    // ping ultimately succeeded on the fallback.
+                    error = ""
                     homeAssistantStatus = HomeassistantStatus.CONNECTED
                     true
                 }

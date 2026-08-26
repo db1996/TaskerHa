@@ -93,6 +93,18 @@ private class AliasKeyManager(
     private val alias: String
 ) : X509ExtendedKeyManager() {
 
+    /**
+     * Cache successful KeyChain lookups. [KeyChain.getPrivateKey] /
+     * [KeyChain.getCertificateChain] do blocking IPC to the system keystore
+     * service. The FIRST call after the process (or the keystore binder) is cold
+     * can transiently throw, which previously returned null and caused the TLS
+     * handshake to proceed WITHOUT the client certificate — Cloudflare then
+     * enforces mTLS and answers HTTP 403, while the next attempt (binder now warm)
+     * succeeds. Retrying + caching makes the very first handshake reliable.
+     */
+    @Volatile private var cachedChain: Array<X509Certificate>? = null
+    @Volatile private var cachedKey: PrivateKey? = null
+
     override fun chooseClientAlias(
         keyTypes: Array<out String>?,
         issuers: Array<out Principal>?,
@@ -101,32 +113,55 @@ private class AliasKeyManager(
 
     override fun getCertificateChain(alias: String?): Array<X509Certificate>? {
         if (alias != this.alias) return null
-        return try {
-            KeyChain.getCertificateChain(appContext, alias)
-        } catch (t: Throwable) {
-            CustomLogger.e(
-                "AliasKeyManager",
-                "getCertificateChain failed for alias=$alias: ${t.message}",
-                LogChannel.GENERAL,
-                t
-            )
-            null
-        }
+        cachedChain?.let { return it }
+        return retryKeyChain("getCertificateChain") {
+            KeyChain.getCertificateChain(appContext, this.alias)
+                ?.takeIf { it.isNotEmpty() }
+        }?.also { cachedChain = it }
     }
 
     override fun getPrivateKey(alias: String?): PrivateKey? {
         if (alias != this.alias) return null
-        return try {
-            KeyChain.getPrivateKey(appContext, alias)
-        } catch (t: Throwable) {
-            CustomLogger.e(
-                "AliasKeyManager",
-                "getPrivateKey failed for alias=$alias: ${t.message}",
-                LogChannel.GENERAL,
-                t
-            )
-            null
+        cachedKey?.let { return it }
+        return retryKeyChain("getPrivateKey") {
+            KeyChain.getPrivateKey(appContext, this.alias)
+        }?.also { cachedKey = it }
+    }
+
+    /**
+     * Runs a KeyChain lookup on the TLS handshake thread, retrying a few times
+     * with a short backoff so a cold-binder failure on the first call doesn't
+     * silently degrade the request to an unauthenticated (no-client-cert) one.
+     */
+    private fun <T> retryKeyChain(op: String, block: () -> T?): T? {
+        var lastError: Throwable? = null
+        repeat(KEYCHAIN_MAX_ATTEMPTS) { attempt ->
+            try {
+                block()?.let { return it }
+            } catch (t: Throwable) {
+                lastError = t
+                CustomLogger.w(
+                    "AliasKeyManager",
+                    "$op attempt ${attempt + 1}/$KEYCHAIN_MAX_ATTEMPTS failed for alias=$alias: ${t.message}",
+                    LogChannel.GENERAL
+                )
+            }
+            if (attempt < KEYCHAIN_MAX_ATTEMPTS - 1) {
+                try {
+                    Thread.sleep(KEYCHAIN_RETRY_BASE_MS * (attempt + 1))
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return null
+                }
+            }
         }
+        CustomLogger.e(
+            "AliasKeyManager",
+            "$op failed after $KEYCHAIN_MAX_ATTEMPTS attempts for alias=$alias: ${lastError?.message}",
+            LogChannel.GENERAL,
+            lastError
+        )
+        return null
     }
 
     override fun getClientAliases(
@@ -144,4 +179,9 @@ private class AliasKeyManager(
         keyType: String?,
         issuers: Array<out Principal>?
     ): Array<String>? = null
+
+    private companion object {
+        const val KEYCHAIN_MAX_ATTEMPTS = 3
+        const val KEYCHAIN_RETRY_BASE_MS = 150L
+    }
 }

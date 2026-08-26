@@ -18,7 +18,8 @@ import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltFo
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormForm
 import com.github.db1996.taskerha.tasker.callservice.data.FieldState
 import com.github.db1996.taskerha.enums.HaServiceFieldType
-import com.github.db1996.taskerha.util.HaHttpClientFactory
+import com.github.db1996.taskerha.enums.HomeassistantStatus
+import com.github.db1996.taskerha.util.HaClientFactory
 import com.github.db1996.taskerha.util.YamlJsonConverter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,11 +99,7 @@ class CallServiceViewModel(
 
         if (pservice.hasTargetDefinition) {
             ensureTargetKeys()
-            launchClientOperation { client ->
-                registryLoading = true
-                registryData = client.getRegistryData()
-                registryLoading = false
-            }
+            loadRegistryData()
         }
 
         Log.d("HA", "Picked service: ${pservice.id}, fields: ${pservice.fields.size}, form: ${form.domain}, form: ${form.service}")
@@ -151,6 +148,42 @@ class CallServiceViewModel(
 
     fun pickEntity(entityId: String) {
         form = form.copy(entityId = entityId)
+    }
+
+    /**
+     * Load optional registry data (friendly names for devices / areas / labels).
+     *
+     * This is supplementary enrichment only — [HomeAssistantClient.getRegistryData]
+     * returns null gracefully when it is unavailable. We deliberately run it OUTSIDE
+     * [launchClientOperation] so that a failed or unreachable fetch never sets the
+     * screen-level [clientError]. Otherwise picking a service with a target definition
+     * (e.g. switch.turn_on) would tear down the whole form via InstanceConnectionStatus
+     * and throw the user back to the connection-error screen, losing their selection.
+     */
+    private fun loadRegistryData() {
+        viewModelScope.launch {
+            registryLoading = true
+            try {
+                val data = withContext(Dispatchers.IO) {
+                    val c = client ?: return@withContext null
+                    // getRegistryData() short-circuits to null unless the client has
+                    // already been pinged. When editing an existing action nothing calls
+                    // changeInstance(), so the only ping is the detached one fired by
+                    // ClientViewModelFactory and it may not have completed yet. Ping
+                    // best-effort here; we deliberately ignore the result and never touch
+                    // clientError, so this stays non-fatal (see the KDoc above).
+                    if (c.homeAssistantStatus != HomeassistantStatus.CONNECTED) {
+                        c.ping()
+                    }
+                    c.getRegistryData()
+                }
+                if (data != null) registryData = data
+            } catch (e: Exception) {
+                logError("Optional registry data load failed (ignored): ${e.message}")
+            } finally {
+                registryLoading = false
+            }
+        }
     }
 
     fun updateFieldValue(fieldId: String, value: String) {
@@ -240,11 +273,7 @@ class CallServiceViewModel(
         selectedService = pservice
 
         if (pservice.hasTargetDefinition) {
-            launchClientOperation { client ->
-                registryLoading = true
-                registryData = client.getRegistryData()
-                registryLoading = false
-            }
+            loadRegistryData()
         }
 
         form = CallServiceFormForm(
@@ -341,15 +370,7 @@ class CallServiceViewModel(
 
     fun retryLoad() = changeInstance(form.instanceId)
 
-    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient {
-        val url = instance.resolveUrl()
-        val token = instance.token
-        val httpClient = HaHttpClientFactory.build(
-            context,
-            clientCertEnabled = instance.clientCertEnabled,
-            clientCertAlias = instance.clientCertAlias
-        )
-        return HomeAssistantClient(url, token, httpClient)
-    }
+    private fun createClientForInstance(instance: HaInstance): HomeAssistantClient =
+        HaClientFactory.forInstance(context, instance)
 }
 
