@@ -1,0 +1,6 @@
+- Connections now try the remote URL first, falling back to the local one on a known home WiFi
+- While the remote stays unreachable, the local endpoint is preferred until the network changes, avoiding a repeated timeout
+- New warning when an instance URL is cleartext http://
+- Fixed client certificate auth failing on the first connection after startup
+- Fixed the Call HA Action form closing when optional registry data failed to load
+- Fixed the log level dropdown, which could never open
