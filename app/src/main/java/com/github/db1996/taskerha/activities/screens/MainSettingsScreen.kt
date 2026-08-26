@@ -1769,7 +1769,10 @@ private fun LogLevelDropdown(
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { !expanded }
+        // onExpandedChange hands us the new state; it has to be assigned, not just
+        // computed. `{ !expanded }` evaluated the negation and discarded it, so
+        // expanded stayed false forever and the menu never opened.
+        onExpandedChange = { expanded = it }
     ) {
         OutlinedTextField(
             modifier = Modifier
@@ -1783,7 +1786,7 @@ private fun LogLevelDropdown(
 
         ExposedDropdownMenu(
             expanded = expanded,
-            onDismissRequest = { }
+            onDismissRequest = { expanded = false }
         ) {
             options.forEach { lvl ->
                 DropdownMenuItem(
@@ -1795,6 +1798,7 @@ private fun LogLevelDropdown(
                     },
                     onClick = {
                         onChange(lvl)
+                        expanded = false
                     }
                 )
             }
