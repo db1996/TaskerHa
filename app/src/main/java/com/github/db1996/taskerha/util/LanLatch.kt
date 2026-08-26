@@ -9,7 +9,6 @@ package com.github.db1996.taskerha.util
  * on — "remote failed, local answered" — is exactly what an attacker who controls
  * the network can fabricate: drop the remote, answer 200 locally. It exists only to
  * avoid repeating a timeout during a genuine connectivity outage.
- * See docs/superpowers/specs/2026-08-25-url-fallback-sicurezza-design.md
  *
  * In-memory only. Process death clears it, which costs one extra timeout and is
  * preferable to letting a stale verdict survive a restart.

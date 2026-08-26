@@ -1050,7 +1050,7 @@ private fun LocalUrlSection(
         value = localUrl,
         onValueChange = onLocalUrlChange,
         label = { Text("Local Home Assistant URL") },
-        placeholder = { Text("https://192.168.1.x:8123") },
+        placeholder = { Text("http://192.168.1.x:8123") },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
     )

@@ -241,8 +241,7 @@ data class HaInstance(
      * needed (HomeAssistantClient invokes it at the top of every ping) and the
      * result must never be cached across pings.
      *
-     * The SSID is not an authenticator and this ordering is not a security boundary;
-     * see docs/superpowers/specs/2026-08-25-url-fallback-sicurezza-design.md
+     * The SSID is not an authenticator and this ordering is not a security boundary.
      *
      * Both parameters default to live state so production callers are unaffected;
      * tests pass them explicitly to keep this function pure.

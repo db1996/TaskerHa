@@ -38,8 +38,7 @@ object HaClientFactory {
      * unreachable, so we latch to skip its timeout next time; settling on the remote
      * one means connectivity is back, so any previous latch is stale.
      *
-     * This is resilience bookkeeping, not a security decision — see
-     * docs/superpowers/specs/2026-08-25-url-fallback-sicurezza-design.md
+     * This is resilience bookkeeping, not a security decision.
      */
     fun noteSelected(instance: HaInstance, selectedUrl: String, ssid: String?) {
         if (instance.localUrl.isNotBlank() && selectedUrl == instance.localUrl) {
