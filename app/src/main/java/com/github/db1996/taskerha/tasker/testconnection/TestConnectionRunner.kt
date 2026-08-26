@@ -2,6 +2,7 @@ package com.github.db1996.taskerha.tasker.testconnection
 
 import android.content.Context
 import com.github.db1996.taskerha.client.HomeAssistantClient
+import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.datamodels.HaSettings
 import com.github.db1996.taskerha.tasker.base.BaseTaskerRunner
 import com.github.db1996.taskerha.tasker.base.RunnerResult
@@ -21,28 +22,31 @@ class TestConnectionRunner : BaseTaskerRunner<TestConnectionInput, TestConnectio
         input: TestConnectionInput
     ): RunnerResult<TestConnectionOutput> {
         return try {
-            val token = HaSettings.loadToken(context)
-            val httpClient = HaHttpClientFactory.build(context)
+            val instance = HaInstanceRepository.getById(input.instanceId)
+                ?: HaInstanceRepository.getDefault()
+
+            val token = instance?.token ?: HaSettings.loadToken(context)
+            val httpClient = HaHttpClientFactory.build(
+                context,
+                clientCertEnabled = instance?.clientCertEnabled ?: HaSettings.loadClientCertEnabled(context),
+                clientCertAlias = instance?.clientCertAlias ?: HaSettings.loadClientCertAlias(context)
+            )
 
             // Test remote connection
-            val remoteUrl = HaSettings.loadUrl(context)
+            val remoteUrl = instance?.remoteUrl ?: HaSettings.loadUrl(context)
             val remoteSuccess = testConnection(remoteUrl, token, httpClient)
             logInfo("Remote connection test: $remoteSuccess (URL: $remoteUrl)")
 
-            // Test local connection if enabled
-            val localUrlEnabled = HaSettings.loadLocalUrlEnabled(context)
-            val localSuccess: Boolean? = if (localUrlEnabled) {
-                val localUrl = HaSettings.loadLocalUrl(context)
-                if (localUrl.isNotBlank()) {
-                    val success = testConnection(localUrl, token, httpClient)
-                    logInfo("Local connection test: $success (URL: $localUrl)")
-                    success
-                } else {
-                    logInfo("Local URL is blank, skipping local test")
-                    null
-                }
+            // Test local connection if a local URL is configured
+            val localUrl = instance?.localUrl ?: HaSettings.loadLocalUrl(context).takeIf {
+                HaSettings.loadLocalUrlEnabled(context)
+            } ?: ""
+            val localSuccess: Boolean? = if (localUrl.isNotBlank()) {
+                val success = testConnection(localUrl, token, httpClient)
+                logInfo("Local connection test: $success (URL: $localUrl)")
+                success
             } else {
-                logInfo("Local URL feature is disabled, skipping local test")
+                logInfo("No local URL configured, skipping local test")
                 null
             }
 
