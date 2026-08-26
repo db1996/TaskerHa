@@ -105,19 +105,9 @@ object HaSettings {
     }
 
     /**
-     * Resolves a single URL to start from. The two branches behave differently:
-     *
-     * - Instance path (an instance exists in [HaInstanceRepository]): delegates to
-     *   [HaInstance.resolveUrl], which returns the *first candidate* of the fallback
-     *   chain. That is normally the remote URL even on a home WiFi — the local URL
-     *   is a fallback tried by HomeAssistantClient.ping(), not a fast path — unless
-     *   the LAN latch is armed for the current SSID, in which case the local URL
-     *   comes first. Callers that can follow the chain should use
-     *   [HaInstance.resolveUrlCandidates] instead of this.
-     * - Legacy fallback (no instance configured): unchanged single-shot behaviour —
-     *   if the "local URL" feature is enabled and the device is connected to one of
-     *   the configured home WiFi SSIDs, returns the local URL; otherwise the remote
-     *   one. No fallback chain exists on this path.
+     * Resolves a single URL to start from. Delegates to [HaInstance.resolveUrl] when
+     * an instance exists (see [HaInstance.resolveUrlCandidates] for the fallback
+     * chain); otherwise falls back to the legacy single-shot local/remote check.
      */
     fun resolveUrl(context: Context): String {
         // Compatibility layer: try repository first, fall back to legacy settings
@@ -227,24 +217,14 @@ data class HaInstance(
     val hacsChecked: Boolean = false
 ) {
     /**
-     * Ordered list of endpoints to try, first to last. Never empty, and never
-     * contains a blank entry unless every configured URL is blank (an unconfigured
-     * instance), in which case the single blank remote URL is returned so that
-     * [first] stays safe for the call sites that rely on it.
+     * Ordered list of endpoints to try, first to last. Never empty. The remote
+     * endpoint goes first — the local one is an offline fallback, gated on a
+     * matching home SSID so an arbitrary network can't offer itself as the local
+     * endpoint — unless the LAN latch is armed, in which case local comes first.
+     * Must be re-evaluated on every call since it depends on live network state.
      *
-     * The remote endpoint goes first: the local one exists as an offline fallback,
-     * not as the fast path. The SSID gate is kept as a precondition — without a
-     * matching SSID the local URL is never attempted at all, otherwise on an
-     * arbitrary network we would send the access token to whatever host happens to
-     * answer at a private address. Because that gate depends on the network the
-     * device is on *right now*, this must be called afresh each time the list is
-     * needed (HomeAssistantClient invokes it at the top of every ping) and the
-     * result must never be cached across pings.
-     *
-     * The SSID is not an authenticator and this ordering is not a security boundary.
-     *
-     * Both parameters default to live state so production callers are unaffected;
-     * tests pass them explicitly to keep this function pure.
+     * Parameters default to live state so production callers are unaffected; tests
+     * pass them explicitly to keep this function pure.
      */
     fun resolveUrlCandidates(
         currentSsid: String? = com.github.db1996.taskerha.util.NetworkHelper.getCurrentSsid(),
@@ -261,20 +241,14 @@ data class HaInstance(
             else -> listOf(remoteUrl, localUrl)
         }
 
-        // A blank URL is not an endpoint. A local-only instance (blank remoteUrl) is
-        // a supported configuration — migrateFromLegacy() produces one whenever only
-        // a token was set — and must keep its local endpoint instead of resolving to
-        // "" and taking down the WebSocket service. Falling back to listOf(remoteUrl)
-        // keeps the list non-empty for the callers that use first().
+        // A local-only instance (blank remoteUrl) must keep its local endpoint
+        // rather than resolve to "" and take down the WebSocket service.
         return ordered.filter { it.isNotBlank() }.ifEmpty { listOf(remoteUrl) }
     }
 
     /**
-     * The endpoint to start from. Kept for the call sites that only need one URL;
-     * the fallback chain lives in [resolveUrlCandidates]. Note this is not
-     * necessarily the local URL on a home WiFi — see [resolveUrlCandidates] for the
-     * ordering. Parameters default to live state exactly as they do there, and exist
-     * so tests can keep this pure.
+     * The endpoint to start from — see [resolveUrlCandidates] for the fallback chain
+     * and ordering. Kept for call sites that only need one URL.
      */
     fun resolveUrl(
         currentSsid: String? = com.github.db1996.taskerha.util.NetworkHelper.getCurrentSsid(),

@@ -4,3 +4,5 @@
 - Fixed client certificate auth failing on the first connection after startup
 - Fixed the Call HA Action form closing when optional registry data failed to load
 - Fixed the log level dropdown, which could never open
+
+Thanks to SimoneAvogadro for the above changes

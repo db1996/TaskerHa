@@ -151,14 +151,9 @@ class CallServiceViewModel(
     }
 
     /**
-     * Load optional registry data (friendly names for devices / areas / labels).
-     *
-     * This is supplementary enrichment only — [HomeAssistantClient.getRegistryData]
-     * returns null gracefully when it is unavailable. We deliberately run it OUTSIDE
-     * [launchClientOperation] so that a failed or unreachable fetch never sets the
-     * screen-level [clientError]. Otherwise picking a service with a target definition
-     * (e.g. switch.turn_on) would tear down the whole form via InstanceConnectionStatus
-     * and throw the user back to the connection-error screen, losing their selection.
+     * Loads optional registry data (friendly names for devices / areas / labels).
+     * Run outside [launchClientOperation] so a failed/unreachable fetch never sets
+     * [clientError] and tears down the form — this is enrichment only, not required.
      */
     private fun loadRegistryData() {
         viewModelScope.launch {
@@ -166,12 +161,7 @@ class CallServiceViewModel(
             try {
                 val data = withContext(Dispatchers.IO) {
                     val c = client ?: return@withContext null
-                    // getRegistryData() short-circuits to null unless the client has
-                    // already been pinged. When editing an existing action nothing calls
-                    // changeInstance(), so the only ping is the detached one fired by
-                    // ClientViewModelFactory and it may not have completed yet. Ping
-                    // best-effort here; we deliberately ignore the result and never touch
-                    // clientError, so this stays non-fatal (see the KDoc above).
+                    // The detached ping fired at construction may not have completed yet.
                     if (c.homeAssistantStatus != HomeassistantStatus.CONNECTED) {
                         c.ping()
                     }

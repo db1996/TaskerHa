@@ -1769,9 +1769,6 @@ private fun LogLevelDropdown(
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        // onExpandedChange hands us the new state; it has to be assigned, not just
-        // computed. `{ !expanded }` evaluated the negation and discarded it, so
-        // expanded stayed false forever and the menu never opened.
         onExpandedChange = { expanded = it }
     ) {
         OutlinedTextField(

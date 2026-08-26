@@ -93,15 +93,9 @@ private class AliasKeyManager(
     private val alias: String
 ) : X509ExtendedKeyManager() {
 
-    /**
-     * Cache successful KeyChain lookups. [KeyChain.getPrivateKey] /
-     * [KeyChain.getCertificateChain] do blocking IPC to the system keystore
-     * service. The FIRST call after the process (or the keystore binder) is cold
-     * can transiently throw, which previously returned null and caused the TLS
-     * handshake to proceed WITHOUT the client certificate — Cloudflare then
-     * enforces mTLS and answers HTTP 403, while the next attempt (binder now warm)
-     * succeeds. Retrying + caching makes the very first handshake reliable.
-     */
+    // Cache successful KeyChain lookups: the first call after a cold keystore
+    // binder can transiently throw, silently degrading the handshake to no client
+    // cert. Retrying + caching makes the first handshake reliable.
     @Volatile private var cachedChain: Array<X509Certificate>? = null
     @Volatile private var cachedKey: PrivateKey? = null
 
@@ -129,9 +123,8 @@ private class AliasKeyManager(
     }
 
     /**
-     * Runs a KeyChain lookup on the TLS handshake thread, retrying a few times
-     * with a short backoff so a cold-binder failure on the first call doesn't
-     * silently degrade the request to an unauthenticated (no-client-cert) one.
+     * Retries a KeyChain lookup with a short backoff so a cold-binder failure on
+     * the first call doesn't silently degrade to an unauthenticated request.
      */
     private fun <T> retryKeyChain(op: String, block: () -> T?): T? {
         var lastError: Throwable? = null

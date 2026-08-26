@@ -5,11 +5,9 @@ import com.github.db1996.taskerha.client.HomeAssistantClient
 import com.github.db1996.taskerha.datamodels.HaInstance
 
 /**
- * Single place where a [HomeAssistantClient] is built for an instance.
- *
- * Consolidates the three identical copies of createClientForInstance that used to
- * live in the CallService / GetState / OnTriggerState view models, which is what
- * lets the endpoint-selection bookkeeping live in exactly one place.
+ * Builds a [HomeAssistantClient] for an instance. Single place for this so the
+ * endpoint-selection bookkeeping (see [LanLatch]) lives in exactly one spot instead
+ * of being duplicated across the CallService / GetState / OnTriggerState view models.
  */
 object HaClientFactory {
 
@@ -22,10 +20,6 @@ object HaClientFactory {
                 clientCertEnabled = instance.clientCertEnabled,
                 clientCertAlias = instance.clientCertAlias
             ),
-            // Re-resolved on every ping, never snapshotted: the client outlives the
-            // network it was built on, and the SSID gate that decides whether the
-            // local endpoint is eligible at all has to be evaluated against the
-            // network in use now, not the one in use at construction time.
             candidateProvider = { instance.resolveUrlCandidates() },
             onEndpointSelected = { selected ->
                 noteSelected(instance, selected, NetworkHelper.getCurrentSsid())
@@ -34,11 +28,8 @@ object HaClientFactory {
     }
 
     /**
-     * Records which endpoint won. Settling on the local URL means the remote one was
-     * unreachable, so we latch to skip its timeout next time; settling on the remote
-     * one means connectivity is back, so any previous latch is stale.
-     *
-     * This is resilience bookkeeping, not a security decision.
+     * Latches to the local URL when it wins (remote must have failed); disarms
+     * otherwise. Resilience bookkeeping only, not a security decision.
      */
     fun noteSelected(instance: HaInstance, selectedUrl: String, ssid: String?) {
         if (instance.localUrl.isNotBlank() && selectedUrl == instance.localUrl) {

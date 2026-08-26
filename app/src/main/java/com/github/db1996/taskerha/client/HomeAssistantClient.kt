@@ -40,21 +40,10 @@ class HomeAssistantClient(
     @Volatile var baseUrl: String = "",
     var accessToken: String = "",
     httpClient: OkHttpClient = OkHttpClient(),
-    /**
-     * Supplies the endpoints to try in order, and is invoked afresh at the top of
-     * every [ping] — never snapshotted. The candidate list depends on live network
-     * state (the SSID gate in HaInstance.resolveUrlCandidates), and a client
-     * outlives any single network: a list captured at construction time would let a
-     * roaming device keep offering a LAN endpoint it is no longer on.
-     *
-     * An empty list means "just use [baseUrl]", which is what every legacy call
-     * site does.
-     */
+    // Endpoints to try in order, re-fetched on every ping so it reflects the current
+    // network. Empty means "just use baseUrl".
     private val candidateProvider: () -> List<String> = { emptyList() },
-    /**
-     * Invoked with the endpoint [ping] settled on. Lets the caller record which
-     * endpoint won without giving this client any knowledge of network policy.
-     */
+    // Called with the endpoint ping() settled on.
     private val onEndpointSelected: (String) -> Unit = {}
 ): BaseLogger {
 
@@ -141,16 +130,9 @@ class HomeAssistantClient(
 
     // --- API calls
     /**
-     * Asks [candidateProvider] for a fresh candidate list, tries each candidate in
-     * order and settles [baseUrl] on the first that answers. Every other method is
-     * gated on [homeAssistantStatus] == CONNECTED and all callers ping before use,
-     * so the endpoint stays put between pings rather than being re-decided on every
-     * request.
-     *
-     * Serialised on [pingMutex]: a detached ping (ClientViewModelFactory fires one
-     * at construction) can otherwise overlap with ensureClientReady()'s, and both
-     * loops walk [baseUrl] through the candidates, so an interleaving would send a
-     * request from one to the host chosen by the other.
+     * Tries each candidate from [candidateProvider] in order and settles [baseUrl]
+     * on the first that answers. Serialised on [pingMutex] since a detached ping can
+     * otherwise overlap with another and race over [baseUrl].
      */
     suspend fun ping(): Boolean = withContext(Dispatchers.IO) {
         pingMutex.withLock {
@@ -187,9 +169,7 @@ class HomeAssistantClient(
                     homeAssistantStatus = HomeassistantStatus.NO_CONNECTION
                     false
                 } else {
-                    // Clear the error left by a previous candidate's failure: callers
-                    // treat a non-empty error as "the connection is broken" even when
-                    // ping ultimately succeeded on the fallback.
+                    // Clear any error left by a previous candidate's failed attempt.
                     error = ""
                     homeAssistantStatus = HomeassistantStatus.CONNECTED
                     true
