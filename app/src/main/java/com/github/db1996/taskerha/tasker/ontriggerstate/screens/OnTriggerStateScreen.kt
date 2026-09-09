@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Card
@@ -23,15 +21,12 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -43,9 +38,11 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.github.db1996.taskerha.activities.partials.EntitySelector
+import com.github.db1996.taskerha.activities.partials.EntityChipsSection
 import com.github.db1996.taskerha.activities.partials.InstanceConnectionStatus
 import com.github.db1996.taskerha.activities.partials.InstanceSelector
+import com.github.db1996.taskerha.activities.partials.TargetPickerRequest
+import com.github.db1996.taskerha.activities.partials.TargetPickerScreen
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.ontriggerstate.data.EntityTriggerConfig
@@ -63,7 +60,7 @@ fun OnTriggerStateScreen(
     onSave: (OnTriggerStateBuiltForm) -> Unit,
     isNewAction: Boolean = false
 ) {
-    var entityAdding by remember { mutableStateOf(false) }
+    var targetPicker by remember { mutableStateOf<TargetPickerRequest?>(null) }
     val instances by HaInstanceRepository.instances.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -83,13 +80,22 @@ fun OnTriggerStateScreen(
     BaseTaskerConfigScaffold(
         title = "On entity trigger state",
         onSave = { onSave(viewModel.buildForm()) },
-        showTestButton = false
+        showTestButton = false,
+        fullScreenOverlay = targetPicker?.let { req ->
+            {
+                TargetPickerScreen(
+                    request = req,
+                    entities = viewModel.entities,
+                    onDismiss = { targetPicker = null }
+                )
+            }
+        }
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxWidth()
-                .then(if (!entityAdding) Modifier.verticalScroll(rememberScrollState()) else Modifier),
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Instance selector (only for new triggers)
@@ -106,61 +112,19 @@ fun OnTriggerStateScreen(
                 )
             }
 
-            if (entityAdding) {
-                InstanceConnectionStatus(
-                    isLoading = viewModel.isLoadingInstance,
-                    error = viewModel.clientError,
-                    onRetry = viewModel::retryLoad
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextField(
-                            value = viewModel.currentDomainSearch,
-                            onValueChange = { viewModel.currentDomainSearch = it },
-                            label = { Text("Filter domain") },
-                            modifier = Modifier.fillMaxWidth()
+            run {
+                EntityChipsSection(
+                    label = "Entities",
+                    entityIds = form.entityIds,
+                    onRemove = { id -> viewModel.setEntityIds(form.entityIds - id) },
+                    onEdit = {
+                        targetPicker = TargetPickerRequest(
+                            entityIds = form.entityIds,
+                            onCommit = { e, _, _, _ -> viewModel.setEntityIds(e) }
                         )
-                        EntitySelector(
-                            entities = viewModel.entities,
-                            serviceDomain = viewModel.currentDomainSearch,
-                            currentEntityId = "",
-                            searching = true,
-                            onSearchChanged = { if (!it) entityAdding = false },
-                            onEntitySelected = { id ->
-                                viewModel.addEntity(id)
-                                entityAdding = false
-                            },
-                            onEntityIdChanged = {}
-                        )
-                    }
-                }
-            } else {
-                // Entity ID list
-                form.entityIds.forEachIndexed { index, entityId ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = entityId,
-                            onValueChange = { viewModel.updateEntityAt(index, it) },
-                            label = { Text("Entity ID") },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true
-                        )
-                        IconButton(onClick = { viewModel.removeEntity(index) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove entity")
-                        }
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = { entityAdding = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                    Text("Add Entity")
-                }
+                    },
+                    emptyHint = "No entities selected yet"
+                )
 
                 // Config per entity toggle
                 Row(

@@ -18,15 +18,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.github.db1996.taskerha.activities.partials.EntitySelector
 import com.github.db1996.taskerha.activities.partials.InstanceConnectionStatus
 import com.github.db1996.taskerha.activities.partials.InstanceSelector
 import com.github.db1996.taskerha.activities.partials.ServiceSelector
+import com.github.db1996.taskerha.activities.partials.TargetPickerRequest
+import com.github.db1996.taskerha.activities.partials.TargetPickerScreen
 import com.github.db1996.taskerha.activities.partials.TargetSection
 import com.github.db1996.taskerha.datamodels.HaInstanceRepository
 import com.github.db1996.taskerha.tasker.base.BaseTaskerConfigScaffold
 import com.github.db1996.taskerha.tasker.callservice.data.CallServiceFormBuiltForm
 import com.github.db1996.taskerha.tasker.callservice.view.CallServiceViewModel
+
+private fun csvToList(value: String?): List<String> =
+    value?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+
+private fun listToCsv(list: List<String>): String = list.joinToString(",")
 
 @Composable
 fun CallServiceScreen(
@@ -34,7 +40,7 @@ fun CallServiceScreen(
     onSave: (CallServiceFormBuiltForm) -> Unit,
     isNewAction: Boolean = false
 ) {
-    var fieldEntitySearching by remember { mutableStateOf<String?>(null) }
+    var targetPicker by remember { mutableStateOf<TargetPickerRequest?>(null) }
     val instances by HaInstanceRepository.instances.collectAsState()
 
     // Load entities on first composition
@@ -52,10 +58,21 @@ fun CallServiceScreen(
             onSave(built)
         },
         onTest = { viewModel.testForm() },
-        showTestButton = true
+        showTestButton = true,
+        fullScreenOverlay = targetPicker?.let { req ->
+            {
+                TargetPickerScreen(
+                    request = req,
+                    entities = viewModel.entities,
+                    registryData = viewModel.registryData,
+                    hacsAvailable = viewModel.hacsAvailable,
+                    onDismiss = { targetPicker = null }
+                )
+            }
+        }
     ) { padding ->
         val scrollState = rememberScrollState()
-        val serviceSelected = viewModel.selectedService != null && fieldEntitySearching == null
+        val serviceSelected = viewModel.selectedService != null
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -105,28 +122,35 @@ fun CallServiceScreen(
                         Text("Service: ${service.id}", style = MaterialTheme.typography.labelMedium)
 
                         if (service.hasTargetDefinition) {
-                            // New target picker UI: Entities + Devices + Areas + Labels tabs
+                            // Target picker UI: Entities + Devices + Areas + Labels
                             val entityField = service.fields.find { it.id == "entity_id" }
-                            fun csvToList(key: String) =
-                                form.dataContainer[key]?.value?.value
-                                    ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
-                                    ?: emptyList()
-                            fun listToCsv(list: List<String>) =
-                                list.joinToString(",")
 
                             TargetSection(
-                                entityIds = csvToList("entity_id"),
-                                deviceIds = csvToList("device_id"),
-                                areaIds = csvToList("area_id"),
-                                labelIds = csvToList("label_id"),
-                                entities = viewModel.entities,
-                                entityDomainFilter = entityField?.domain,
+                                entityIds = csvToList(form.dataContainer["entity_id"]?.value?.value),
+                                deviceIds = csvToList(form.dataContainer["device_id"]?.value?.value),
+                                areaIds = csvToList(form.dataContainer["area_id"]?.value?.value),
+                                labelIds = csvToList(form.dataContainer["label_id"]?.value?.value),
                                 registryData = viewModel.registryData,
-                                hacsAvailable = viewModel.hacsAvailable,
                                 onEntityIdsChange = { viewModel.updateFieldValue("entity_id", listToCsv(it)) },
                                 onDeviceIdsChange = { viewModel.updateFieldValue("device_id", listToCsv(it)) },
                                 onAreaIdsChange = { viewModel.updateFieldValue("area_id", listToCsv(it)) },
                                 onLabelIdsChange = { viewModel.updateFieldValue("label_id", listToCsv(it)) },
+                                onEditTargets = {
+                                    targetPicker = TargetPickerRequest(
+                                        domainFilter = entityField?.domain,
+                                        showRegistryTabs = true,
+                                        entityIds = csvToList(form.dataContainer["entity_id"]?.value?.value),
+                                        deviceIds = csvToList(form.dataContainer["device_id"]?.value?.value),
+                                        areaIds = csvToList(form.dataContainer["area_id"]?.value?.value),
+                                        labelIds = csvToList(form.dataContainer["label_id"]?.value?.value),
+                                        onCommit = { e, d, a, l ->
+                                            viewModel.updateFieldValue("entity_id", listToCsv(e))
+                                            viewModel.updateFieldValue("device_id", listToCsv(d))
+                                            viewModel.updateFieldValue("area_id", listToCsv(a))
+                                            viewModel.updateFieldValue("label_id", listToCsv(l))
+                                        }
+                                    )
+                                }
                             )
 
                             // Render remaining non-entity fields
@@ -142,54 +166,27 @@ fun CallServiceScreen(
                                 }
                             }
                         } else {
-                            // Legacy entity search path for services without target definition
-                            fieldEntitySearching?.let { fieldId ->
-                                service.fields.find { it.id == fieldId }?.let { field ->
-                                    form.dataContainer[fieldId]?.let { state ->
-                                        if (state.value.value.isNotBlank()) {
-                                            Text(
-                                                "${field.name ?: field.id}: ${state.value.value}",
-                                                style = MaterialTheme.typography.labelMedium
+                            // Services without a target definition: each entity field opens
+                            // the full-screen picker for that field.
+                            service.fields.forEach { field ->
+                                form.dataContainer[field.id]?.let { state ->
+                                    FieldInput(
+                                        field = field,
+                                        state = state,
+                                        onValueChange = { viewModel.updateFieldValue(field.id, it) },
+                                        onToggleChange = { viewModel.updateFieldToggle(field.id, it) },
+                                        onEntitySearch = {
+                                            val fieldId = field.id
+                                            targetPicker = TargetPickerRequest(
+                                                domainFilter = field.domain,
+                                                showRegistryTabs = false,
+                                                entityIds = csvToList(state.value.value),
+                                                onCommit = { e, _, _, _ ->
+                                                    viewModel.updateFieldValue(fieldId, listToCsv(e))
+                                                }
                                             )
                                         }
-                                        EntitySelector(
-                                            entities = viewModel.entities,
-                                            serviceDomain = field.domain ?: "",
-                                            currentEntityId = state.value.value,
-                                            searching = true,
-                                            onSearchChanged = { searching ->
-                                                if (!searching) fieldEntitySearching = null
-                                            },
-                                            onEntitySelected = { entityId ->
-                                                if (field.multipleEntities) {
-                                                    val current = state.value.value
-                                                    val newValue = if (current.isBlank()) entityId
-                                                                  else "$current,$entityId"
-                                                    viewModel.updateFieldValue(fieldId, newValue)
-                                                } else {
-                                                    viewModel.updateFieldValue(fieldId, entityId)
-                                                }
-                                                fieldEntitySearching = null
-                                            },
-                                            onEntityIdChanged = { entityId ->
-                                                viewModel.updateFieldValue(fieldId, entityId)
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (fieldEntitySearching == null) {
-                                service.fields.forEach { field ->
-                                    form.dataContainer[field.id]?.let { state ->
-                                        FieldInput(
-                                            field = field,
-                                            state = state,
-                                            onValueChange = { viewModel.updateFieldValue(field.id, it) },
-                                            onToggleChange = { viewModel.updateFieldToggle(field.id, it) },
-                                            onEntitySearch = { fieldEntitySearching = field.id }
-                                        )
-                                    }
+                                    )
                                 }
                             }
                         }
@@ -199,4 +196,3 @@ fun CallServiceScreen(
         }
     }
 }
-

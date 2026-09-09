@@ -61,8 +61,16 @@ fun BaseTaskerConfigScaffold(
     onTest: (() -> Unit)? = null,
     showTestButton: Boolean = true,
     topBarActions: @Composable () -> Unit = {},
+    fullScreenOverlay: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
+    // When an overlay is supplied (e.g. the target picker) it takes over the whole
+    // screen, including its own top bar, so the Save/Test actions here are hidden.
+    if (fullScreenOverlay != null) {
+        fullScreenOverlay()
+        return
+    }
+
     Scaffold(
         modifier = modifier,
         topBar = {

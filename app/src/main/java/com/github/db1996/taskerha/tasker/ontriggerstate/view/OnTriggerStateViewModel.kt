@@ -50,37 +50,15 @@ class OnTriggerStateViewModel(
         get() = LogChannel.WEBSOCKET
 
     // UI event handlers
-//    fun pickEntity(entityId: String) {
-//        form = form.copy(entityId = entityId)
-//    }
 
-    fun addEntity(entityId: String) {
-        val trimmed = entityId.trim()
-        if (trimmed.isNotBlank() && trimmed !in form.entityIds) {
-            form = form.copy(
-                entityIds = form.entityIds + trimmed,
-                entityConfigs = form.entityConfigs + EntityTriggerConfig(entityId = trimmed)
-            )
+    /** Replace the whole entity set (from the full-screen target picker), keeping the
+     *  per-entity config for ids that survive the edit. */
+    fun setEntityIds(ids: List<String>) {
+        val cleaned = ids.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        val newConfigs = cleaned.map { id ->
+            form.entityConfigs.find { it.entityId == id } ?: EntityTriggerConfig(entityId = id)
         }
-    }
-
-    fun removeEntity(index: Int) {
-        form = form.copy(
-            entityIds = form.entityIds.toMutableList().also { it.removeAt(index) },
-            entityConfigs = form.entityConfigs.toMutableList().also {
-                if (index < it.size) it.removeAt(index)
-            }
-        )
-    }
-
-    fun updateEntityAt(index: Int, value: String) {
-        val updatedIds = form.entityIds.toMutableList()
-        updatedIds[index] = value
-        val updatedConfigs = form.entityConfigs.toMutableList()
-        if (index < updatedConfigs.size) {
-            updatedConfigs[index] = updatedConfigs[index].copy(entityId = value)
-        }
-        form = form.copy(entityIds = updatedIds, entityConfigs = updatedConfigs)
+        form = form.copy(entityIds = cleaned, entityConfigs = newConfigs)
     }
 
     private fun updateConfig(index: Int, update: (EntityTriggerConfig) -> EntityTriggerConfig) {
