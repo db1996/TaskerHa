@@ -1,0 +1,1 @@
+- changed target/entity selectors to be consistent. And have a manual option to use tasker variables
